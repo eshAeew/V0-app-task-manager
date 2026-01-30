@@ -361,10 +361,13 @@ export default function TaskManager() {
     const counts: Record<string, number> = {};
     tasks.filter((t) => !t.isArchived && !t.isDeleted).forEach((task) => {
       counts[task.category] = (counts[task.category] || 0) + 1;
-      counts[task.status] = (counts[task.status] || 0) + 1;
+      // For status counts, only count tasks in the selected list if a list is selected
+      if (!selectedListId || task.listId === selectedListId) {
+        counts[task.status] = (counts[task.status] || 0) + 1;
+      }
     });
     return counts;
-  }, [tasks]);
+  }, [tasks, selectedListId]);
 
   const favoriteCount = tasks.filter((t) => t.isFavorite && !t.isArchived && !t.isDeleted).length;
   const archivedCount = tasks.filter((t) => t.isArchived && !t.isDeleted).length;
@@ -409,7 +412,12 @@ export default function TaskManager() {
 
   const handleNewTask = () => {
     setEditingTask(null);
-    setDefaultStatus("todo");
+    // Use first status from active columns (list-specific or global)
+    const selectedList = customLists.find((l) => l.id === selectedListId);
+    const firstStatus = (selectedListId && selectedList?.columns?.length) 
+      ? selectedList.columns[0].id 
+      : columns[0]?.id || "todo";
+    setDefaultStatus(firstStatus);
     setDefaultDueDate(undefined);
     setDialogOpen(true);
   };
@@ -814,6 +822,66 @@ export default function TaskManager() {
     addActivityLog("Status Deleted", `Deleted status: ${column.title}`);
   };
 
+  // List-specific column/status management
+  const handleAddListColumn = (listId: string, column: Column) => {
+    setCustomLists(customLists.map((list) => {
+      if (list.id === listId) {
+        const existingColumns = list.columns || [];
+        return { ...list, columns: [...existingColumns, column] };
+      }
+      return list;
+    }));
+    const list = customLists.find((l) => l.id === listId);
+    showToast("Status created", `${column.title} added to "${list?.name}"`);
+    addActivityLog("List Status Created", `Created "${column.title}" in list "${list?.name}"`);
+  };
+
+  const handleUpdateListColumn = (listId: string, column: Column) => {
+    setCustomLists(customLists.map((list) => {
+      if (list.id === listId && list.columns) {
+        return {
+          ...list,
+          columns: list.columns.map((c) => (c.id === column.id ? column : c)),
+        };
+      }
+      return list;
+    }));
+    showToast("Status updated", column.title);
+    addActivityLog("List Status Updated", `Updated status: ${column.title}`);
+  };
+
+  const handleDeleteListColumn = (listId: string, columnId: string) => {
+    const list = customLists.find((l) => l.id === listId);
+    const listColumns = list?.columns || [];
+    const column = listColumns.find((c) => c.id === columnId);
+    
+    if (!column || listColumns.length <= 1) {
+      showToast("Cannot delete", "At least one status is required");
+      return;
+    }
+    
+    const remainingColumns = listColumns.filter((c) => c.id !== columnId);
+    const targetColumn = remainingColumns[0];
+    
+    setCustomLists(customLists.map((l) => {
+      if (l.id === listId) {
+        return { ...l, columns: remainingColumns };
+      }
+      return l;
+    }));
+    
+    // Move tasks with this status to the first remaining status
+    setTasks(tasks.map((t) => 
+      t.listId === listId && t.status === columnId 
+        ? { ...t, status: targetColumn.id } 
+        : t
+    ));
+    
+    if (selectedStatus === columnId) setSelectedStatus(null);
+    showToast("Status deleted", `${column.title}. Tasks moved to ${targetColumn.title}`);
+    addActivityLog("List Status Deleted", `Deleted status: ${column.title}`);
+  };
+
   // Notification management
   const handleMarkNotificationRead = (id: string) => {
     setNotifications(
@@ -859,6 +927,15 @@ export default function TaskManager() {
 
   // Check if any filters are active
   const hasActiveFilters = selectedCategory || selectedListId || selectedStatus || filterPriority !== "all" || searchQuery;
+
+  // Get active columns: use list-specific columns if a list is selected and has columns, otherwise use global columns
+  const selectedList = customLists.find((l) => l.id === selectedListId);
+  const activeColumns = useMemo(() => {
+    if (selectedListId && selectedList?.columns && selectedList.columns.length > 0) {
+      return selectedList.columns;
+    }
+    return columns;
+  }, [selectedListId, selectedList?.columns, columns]);
 
   // Show loading state
   if (!isHydrated) {
@@ -914,6 +991,9 @@ export default function TaskManager() {
             onDeleteColumn={handleDeleteColumn}
             selectedStatus={selectedStatus}
             onStatusSelect={handleStatusSelect}
+            onAddListColumn={handleAddListColumn}
+            onUpdateListColumn={handleUpdateListColumn}
+            onDeleteListColumn={handleDeleteListColumn}
           />
         </div>
 
@@ -1164,7 +1244,7 @@ export default function TaskManager() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent className="rounded-xl">
-                        {columns.map((col) => (
+                        {activeColumns.map((col) => (
                           <DropdownMenuItem
                             key={col.id}
                             onClick={() => handleBulkMove(col.id)}
@@ -1206,7 +1286,7 @@ export default function TaskManager() {
 
                 {/* Kanban Board */}
                 <div className="flex gap-6 print:block print:space-y-4">
-                  {columns.map((column) => (
+                  {activeColumns.map((column) => (
                     <KanbanColumn
                       key={column.id}
                       column={column}
@@ -1311,7 +1391,7 @@ export default function TaskManager() {
         onSave={handleSaveTask}
         customLists={customLists}
         categories={categories}
-        columns={columns}
+        columns={activeColumns}
         templates={templates}
       />
 

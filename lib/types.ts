@@ -66,6 +66,7 @@ export interface CustomList {
   name: string;
   color: string;
   createdAt: string;
+  columns?: Column[]; // List-specific statuses/columns
 }
 
 // Task template for reusable task configurations

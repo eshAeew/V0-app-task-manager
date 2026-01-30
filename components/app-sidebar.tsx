@@ -61,7 +61,7 @@ interface AppSidebarProps {
   onAddCategory: (category: Category) => void;
   onUpdateCategory: (category: Category) => void;
   onDeleteCategory: (categoryId: string) => void;
-  // New props for custom columns
+  // New props for custom columns (global)
   columns: Column[];
   onAddColumn: (column: Column) => void;
   onUpdateColumn: (column: Column) => void;
@@ -69,6 +69,10 @@ interface AppSidebarProps {
   // Status filter
   selectedStatus: string | null;
   onStatusSelect: (statusId: string | null) => void;
+  // List-specific column handlers
+  onAddListColumn: (listId: string, column: Column) => void;
+  onUpdateListColumn: (listId: string, column: Column) => void;
+  onDeleteListColumn: (listId: string, columnId: string) => void;
 }
 
 const iconMap: Record<string, React.ElementType> = {
@@ -113,6 +117,9 @@ export function AppSidebar({
   onDeleteColumn,
   selectedStatus,
   onStatusSelect,
+  onAddListColumn,
+  onUpdateListColumn,
+  onDeleteListColumn,
 }: AppSidebarProps) {
   const [showNewListDialog, setShowNewListDialog] = useState(false);
   const [editingList, setEditingList] = useState<CustomList | null>(null);
@@ -135,6 +142,13 @@ export function AppSidebar({
   const totalTasks = Object.values(taskCounts).reduce((a, b) => a + b, 0) / 2; // Divided by 2 because we count both category and status
   const completedTasks = taskCounts.done || 0;
   const progress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+
+  // Get active columns: use list-specific columns if a list is selected and has columns, otherwise use global columns
+  const selectedList = customLists.find((l) => l.id === selectedListId);
+  const activeColumns = selectedListId && selectedList?.columns && selectedList.columns.length > 0
+    ? selectedList.columns
+    : columns;
+  const isUsingListColumns = selectedListId && selectedList?.columns && selectedList.columns.length > 0;
 
   const menuItems = [
     { icon: Home, label: "All Tasks", mode: "all" as ViewMode, count: Math.floor(totalTasks) },
@@ -219,16 +233,23 @@ export function AppSidebar({
     setNewCategoryIcon(category.icon);
   };
 
-  // Column handlers
+  // Column handlers - now support list-specific columns
   const handleCreateColumn = () => {
     if (newColumnName.trim()) {
       const newColumn: Column = {
-        id: newColumnName.trim().toLowerCase().replace(/\s+/g, "-"),
+        id: generateId(), // Use unique ID to avoid conflicts
         title: newColumnName.trim(),
         color: newColumnColor,
         isCustom: true,
       };
-      onAddColumn(newColumn);
+      
+      // If a list is selected, add column to that list
+      if (selectedListId) {
+        onAddListColumn(selectedListId, newColumn);
+      } else {
+        onAddColumn(newColumn);
+      }
+      
       setNewColumnName("");
       setNewColumnColor(LIST_COLORS[0]);
       setShowColumnDialog(false);
@@ -237,14 +258,31 @@ export function AppSidebar({
 
   const handleUpdateColumn = () => {
     if (editingColumn && newColumnName.trim()) {
-      onUpdateColumn({
+      const updatedColumn = {
         ...editingColumn,
         title: newColumnName.trim(),
         color: newColumnColor,
-      });
+      };
+      
+      // If a list is selected and using list columns, update list column
+      if (selectedListId && isUsingListColumns) {
+        onUpdateListColumn(selectedListId, updatedColumn);
+      } else {
+        onUpdateColumn(updatedColumn);
+      }
+      
       setEditingColumn(null);
       setNewColumnName("");
       setNewColumnColor(LIST_COLORS[0]);
+    }
+  };
+
+  const handleDeleteColumnClick = (columnId: string) => {
+    // If a list is selected and using list columns, delete from list
+    if (selectedListId && isUsingListColumns) {
+      onDeleteListColumn(selectedListId, columnId);
+    } else {
+      onDeleteColumn(columnId);
     }
   };
 
@@ -465,20 +503,28 @@ export function AppSidebar({
         {/* Status Quick Filters */}
         <div className="pt-4 mt-4 border-t border-sidebar-border">
           <div className="flex items-center justify-between px-3 mb-2">
-            <p className="text-xs font-medium text-sidebar-foreground/50 uppercase tracking-wider">
-              Status
-            </p>
+            <div className="flex flex-col">
+              <p className="text-xs font-medium text-sidebar-foreground/50 uppercase tracking-wider">
+                Status
+              </p>
+              {selectedListId && (
+                <p className="text-[10px] text-sidebar-foreground/40">
+                  {isUsingListColumns ? `For "${selectedList?.name}"` : "Using global statuses"}
+                </p>
+              )}
+            </div>
             <Button
               variant="ghost"
               size="icon"
               className="h-6 w-6 rounded-lg"
               onClick={() => setShowColumnDialog(true)}
+              title={selectedListId ? `Add status to "${selectedList?.name}"` : "Add global status"}
             >
               <Plus className="h-4 w-4" />
             </Button>
           </div>
           <div className="space-y-1">
-            {columns.map((column) => (
+            {activeColumns.map((column) => (
               <div key={column.id} className="group relative">
                 <Button
                   variant="ghost"
@@ -491,7 +537,10 @@ export function AppSidebar({
                     onStatusSelect(selectedStatus === column.id ? null : column.id);
                     onViewModeChange("all");
                     onCategorySelect(null);
-                    onSelectList(null);
+                    // Don't clear list selection when clicking status within a list
+                    if (!selectedListId) {
+                      onSelectList(null);
+                    }
                   }}
                 >
                   <div 
@@ -520,7 +569,7 @@ export function AppSidebar({
                       Edit
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={() => onDeleteColumn(column.id)}
+                      onClick={() => handleDeleteColumnClick(column.id)}
                       className="text-destructive focus:text-destructive"
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
@@ -706,9 +755,19 @@ export function AppSidebar({
         <DialogContent className="sm:max-w-[400px] rounded-3xl">
           <DialogHeader>
             <DialogTitle>
-              {editingColumn ? "Edit Status Column" : "Create New Status Column"}
+              {editingColumn 
+                ? "Edit Status Column" 
+                : selectedListId 
+                  ? `Create Status for "${selectedList?.name}"`
+                  : "Create Global Status Column"
+              }
             </DialogTitle>
           </DialogHeader>
+          {selectedListId && !editingColumn && (
+            <p className="text-sm text-muted-foreground -mt-2">
+              This status will only appear in the &quot;{selectedList?.name}&quot; list.
+            </p>
+          )}
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Status Name</label>
