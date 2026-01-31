@@ -40,7 +40,16 @@ import {
   Link2,
   FileText,
   GripVertical,
+  ChevronDown,
+  ChevronRight,
+  Trash2,
+  Save,
 } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Checkbox } from "@/components/ui/checkbox";
 
 interface TaskDialogProps {
@@ -55,6 +64,8 @@ interface TaskDialogProps {
   categories?: Category[];
   columns?: Column[];
   templates?: TaskTemplate[];
+  onAddTemplate?: (template: TaskTemplate) => void;
+  onDeleteTemplate?: (templateId: string) => void;
 }
 
 export function TaskDialog({
@@ -69,6 +80,8 @@ export function TaskDialog({
   categories = DEFAULT_CATEGORIES,
   columns = DEFAULT_COLUMNS,
   templates = [],
+  onAddTemplate,
+  onDeleteTemplate,
 }: TaskDialogProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -88,6 +101,11 @@ export function TaskDialog({
   const [recurrence, setRecurrence] = useState<RecurrenceType>("none");
   const [dependsOn, setDependsOn] = useState<string[]>([]);
   const [draggedSubtaskIndex, setDraggedSubtaskIndex] = useState<number | null>(null);
+  
+  // Template state
+  const [templatesExpanded, setTemplatesExpanded] = useState(false);
+  const [showCreateTemplate, setShowCreateTemplate] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState("");
 
   useEffect(() => {
     if (task) {
@@ -134,6 +152,27 @@ export function TaskDialog({
     setSubtasks(template.subtasks?.map(s => ({ ...s, id: generateId() })) || []);
     setTimeEstimate(template.timeEstimate);
     setRecurrence(template.recurrence || "none");
+  };
+
+  const saveAsTemplate = () => {
+    if (!newTemplateName.trim() || !onAddTemplate) return;
+    
+    const newTemplate: TaskTemplate = {
+      id: generateId(),
+      name: newTemplateName.trim(),
+      title: title,
+      description: description,
+      priority: priority,
+      category: category,
+      tags: [...tags],
+      subtasks: subtasks.length > 0 ? subtasks.map(s => ({ ...s, id: generateId() })) : undefined,
+      timeEstimate: timeEstimate,
+      recurrence: recurrence !== "none" ? recurrence : undefined,
+    };
+    
+    onAddTemplate(newTemplate);
+    setShowCreateTemplate(false);
+    setNewTemplateName("");
   };
 
   const handleSave = () => {
@@ -224,25 +263,102 @@ export function TaskDialog({
             </DialogTitle>
           </DialogHeader>
 
-          {/* Templates - only show when creating new task */}
+          {/* Templates - collapsible section, only show when creating new task */}
           {!task && templates.length > 0 && (
-            <div className="mb-4">
-              <Label className="text-sm font-medium flex items-center gap-2 mb-2">
-                <FileText className="h-4 w-4 text-muted-foreground" />
-                Templates
-              </Label>
-              <div className="flex flex-wrap gap-2">
-                {templates.map((template) => (
-                  <Button
-                    key={template.id}
-                    variant="outline"
-                    size="sm"
-                    className="rounded-lg text-xs bg-transparent"
-                    onClick={() => applyTemplate(template)}
-                  >
-                    {template.name}
+            <Collapsible open={templatesExpanded} onOpenChange={setTemplatesExpanded} className="mb-4">
+              <div className="flex items-center justify-between">
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-2 px-2 -ml-2 hover:bg-secondary/50">
+                    {templatesExpanded ? (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Templates</span>
+                    <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
+                      {templates.length}
+                    </Badge>
                   </Button>
-                ))}
+                </CollapsibleTrigger>
+                {onAddTemplate && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowCreateTemplate(true)}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Create Template
+                  </Button>
+                )}
+              </div>
+              <CollapsibleContent className="mt-2">
+                <div className="flex flex-wrap gap-2 max-h-[120px] overflow-y-auto p-1 -m-1">
+                  {templates.map((template) => (
+                    <div key={template.id} className="group relative">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="rounded-lg text-xs bg-transparent pr-7"
+                        onClick={() => applyTemplate(template)}
+                      >
+                        {template.name}
+                      </Button>
+                      {onDeleteTemplate && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteTemplate(template.id);
+                          }}
+                          className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-destructive/10 transition-opacity"
+                        >
+                          <X className="h-3 w-3 text-destructive" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+          
+          {/* Create Template Dialog */}
+          {showCreateTemplate && (
+            <div className="mb-4 p-3 rounded-xl bg-secondary/30 border border-border/50 space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium flex items-center gap-2">
+                  <Save className="h-4 w-4 text-muted-foreground" />
+                  Save Current Form as Template
+                </Label>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => setShowCreateTemplate(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Fill out the form below with your desired defaults, then save it as a reusable template.
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  value={newTemplateName}
+                  onChange={(e) => setNewTemplateName(e.target.value)}
+                  placeholder="Template name..."
+                  className="rounded-lg bg-background/50 text-sm h-8"
+                  onKeyDown={(e) => e.key === "Enter" && saveAsTemplate()}
+                />
+                <Button
+                  size="sm"
+                  className="rounded-lg h-8"
+                  onClick={saveAsTemplate}
+                  disabled={!newTemplateName.trim()}
+                >
+                  Save
+                </Button>
               </div>
             </div>
           )}

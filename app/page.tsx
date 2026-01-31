@@ -95,6 +95,133 @@ const DEFAULT_TEMPLATES: TaskTemplate[] = [
     category: "work",
     tags: ["meeting"],
   },
+  {
+    id: "template-4",
+    name: "Code Review",
+    title: "Review: ",
+    description: "PR/MR Link:\n\nReview Checklist:\n- Code quality\n- Tests included\n- Documentation updated\n\nComments:",
+    priority: "medium",
+    category: "development",
+    tags: ["review", "code"],
+    subtasks: [
+      { id: "s1", title: "Read through changes", completed: false },
+      { id: "s2", title: "Test locally", completed: false },
+      { id: "s3", title: "Leave feedback", completed: false },
+      { id: "s4", title: "Approve or request changes", completed: false },
+    ],
+    timeEstimate: 30,
+  },
+  {
+    id: "template-5",
+    name: "Research Task",
+    title: "Research: ",
+    description: "Topic:\n\nObjectives:\n\nSources to explore:\n\nFindings:",
+    priority: "medium",
+    category: "work",
+    tags: ["research"],
+    subtasks: [
+      { id: "s1", title: "Define research scope", completed: false },
+      { id: "s2", title: "Gather resources", completed: false },
+      { id: "s3", title: "Analyze findings", completed: false },
+      { id: "s4", title: "Document conclusions", completed: false },
+    ],
+    timeEstimate: 60,
+  },
+  {
+    id: "template-6",
+    name: "Design Task",
+    title: "Design: ",
+    description: "Design brief:\n\nRequirements:\n\nDeliverables:",
+    priority: "medium",
+    category: "design",
+    tags: ["design", "ui"],
+    subtasks: [
+      { id: "s1", title: "Review requirements", completed: false },
+      { id: "s2", title: "Create wireframes", completed: false },
+      { id: "s3", title: "Design mockups", completed: false },
+      { id: "s4", title: "Get feedback", completed: false },
+      { id: "s5", title: "Finalize designs", completed: false },
+    ],
+    timeEstimate: 120,
+  },
+  {
+    id: "template-7",
+    name: "Weekly Review",
+    title: "Weekly Review - ",
+    description: "What went well:\n\nWhat could improve:\n\nKey learnings:\n\nGoals for next week:",
+    priority: "low",
+    category: "personal",
+    tags: ["review", "weekly"],
+    recurrence: "weekly",
+  },
+  {
+    id: "template-8",
+    name: "Client Call",
+    title: "Call with: ",
+    description: "Client:\n\nPurpose:\n\nDiscussion points:\n\nFollow-up actions:",
+    priority: "high",
+    category: "work",
+    tags: ["client", "call"],
+    subtasks: [
+      { id: "s1", title: "Prepare agenda", completed: false },
+      { id: "s2", title: "Review previous notes", completed: false },
+      { id: "s3", title: "Conduct call", completed: false },
+      { id: "s4", title: "Send follow-up email", completed: false },
+    ],
+    timeEstimate: 45,
+  },
+  {
+    id: "template-9",
+    name: "Sprint Planning",
+    title: "Sprint: ",
+    description: "Sprint Goal:\n\nCapacity:\n\nCarryover items:\n\nNew items:",
+    priority: "medium",
+    category: "work",
+    tags: ["sprint", "planning"],
+    subtasks: [
+      { id: "s1", title: "Review backlog", completed: false },
+      { id: "s2", title: "Estimate stories", completed: false },
+      { id: "s3", title: "Commit to sprint goal", completed: false },
+      { id: "s4", title: "Update board", completed: false },
+    ],
+    timeEstimate: 60,
+    recurrence: "weekly",
+  },
+  {
+    id: "template-10",
+    name: "Documentation",
+    title: "Document: ",
+    description: "Topic:\n\nAudience:\n\nOutline:\n\nKey sections:",
+    priority: "low",
+    category: "development",
+    tags: ["docs", "documentation"],
+    subtasks: [
+      { id: "s1", title: "Outline structure", completed: false },
+      { id: "s2", title: "Write first draft", completed: false },
+      { id: "s3", title: "Add examples", completed: false },
+      { id: "s4", title: "Review and edit", completed: false },
+    ],
+    timeEstimate: 90,
+  },
+  {
+    id: "template-11",
+    name: "Quick Task",
+    title: "",
+    description: "",
+    priority: "medium",
+    category: "work",
+    tags: [],
+    timeEstimate: 15,
+  },
+  {
+    id: "template-12",
+    name: "Personal Errand",
+    title: "",
+    description: "",
+    priority: "low",
+    category: "personal",
+    tags: ["errand"],
+  },
 ];
 
 export default function TaskManager() {
@@ -882,6 +1009,22 @@ export default function TaskManager() {
     addActivityLog("List Status Deleted", `Deleted status: ${column.title}`);
   };
 
+  // Template management
+  const handleAddTemplate = (template: TaskTemplate) => {
+    setTemplates([...templates, template]);
+    showToast("Template created", template.name);
+    addActivityLog("Template Created" as any, `Created template: ${template.name}`);
+  };
+
+  const handleDeleteTemplate = (templateId: string) => {
+    const template = templates.find((t) => t.id === templateId);
+    setTemplates(templates.filter((t) => t.id !== templateId));
+    if (template) {
+      showToast("Template deleted", template.name);
+      addActivityLog("Template Deleted" as any, `Deleted template: ${template.name}`);
+    }
+  };
+
   // Notification management
   const handleMarkNotificationRead = (id: string) => {
     setNotifications(
@@ -1381,19 +1524,21 @@ export default function TaskManager() {
       </div>
 
       {/* Task Dialog */}
-      <TaskDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        task={editingTask}
-        defaultStatus={defaultStatus}
-        defaultDueDate={defaultDueDate}
-        defaultListId={selectedListId || undefined}
-        onSave={handleSaveTask}
-        customLists={customLists}
-        categories={categories}
-        columns={activeColumns}
-        templates={templates}
-      />
+<TaskDialog
+  open={dialogOpen}
+  onOpenChange={setDialogOpen}
+  task={editingTask}
+  defaultStatus={defaultStatus}
+  defaultDueDate={defaultDueDate}
+  defaultListId={selectedListId || undefined}
+  onSave={handleSaveTask}
+  customLists={customLists}
+  categories={categories}
+  columns={activeColumns}
+  templates={templates}
+  onAddTemplate={handleAddTemplate}
+  onDeleteTemplate={handleDeleteTemplate}
+  />
 
       {/* Keyboard Shortcuts Dialog */}
       <Dialog open={showKeyboardShortcuts} onOpenChange={setShowKeyboardShortcuts}>
