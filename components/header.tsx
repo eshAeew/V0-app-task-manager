@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,13 +64,20 @@ export function Header({
   onClearNotification,
   onClearAllNotifications,
 }: HeaderProps) {
-  const [isDark, setIsDark] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const { theme, setTheme, resolvedTheme } = useTheme();
+
+  // Prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const toggleTheme = () => {
-    setIsDark(!isDark);
-    document.documentElement.classList.toggle("dark");
+    setTheme(resolvedTheme === "dark" ? "light" : "dark");
   };
+
+  const isDark = resolvedTheme === "dark";
 
   const unreadCount = notifications.filter((n) => n.unread).length;
 
@@ -172,8 +180,12 @@ export function Header({
               className="rounded-xl h-10 w-10"
               onClick={toggleTheme}
             >
-              {isDark ? (
-                <Sun className="h-5 w-5" />
+              {mounted ? (
+                isDark ? (
+                  <Sun className="h-5 w-5" />
+                ) : (
+                  <Moon className="h-5 w-5" />
+                )
               ) : (
                 <Moon className="h-5 w-5" />
               )}
