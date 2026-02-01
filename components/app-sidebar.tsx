@@ -73,6 +73,8 @@ interface AppSidebarProps {
   onAddListColumn: (listId: string, column: Column) => void;
   onUpdateListColumn: (listId: string, column: Column) => void;
   onDeleteListColumn: (listId: string, columnId: string) => void;
+  // Drag and drop to lists
+  onDropTaskToList?: (taskId: string, listId: string) => void;
 }
 
 const iconMap: Record<string, React.ElementType> = {
@@ -120,11 +122,13 @@ export function AppSidebar({
   onAddListColumn,
   onUpdateListColumn,
   onDeleteListColumn,
+  onDropTaskToList,
 }: AppSidebarProps) {
   const [showNewListDialog, setShowNewListDialog] = useState(false);
   const [editingList, setEditingList] = useState<CustomList | null>(null);
   const [newListName, setNewListName] = useState("");
   const [newListColor, setNewListColor] = useState(LIST_COLORS[0]);
+  const [dragOverListId, setDragOverListId] = useState<string | null>(null);
 
   // Category dialog state
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
@@ -369,13 +373,35 @@ export function AppSidebar({
 
           <div className="space-y-1">
             {customLists.map((list) => (
-              <div key={list.id} className="group relative">
+              <div 
+                key={list.id} 
+                className="group relative"
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setDragOverListId(list.id);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  setDragOverListId(null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const taskId = e.dataTransfer.getData("taskId");
+                  if (taskId && onDropTaskToList) {
+                    onDropTaskToList(taskId, list.id);
+                  }
+                  setDragOverListId(null);
+                }}
+              >
                 <Button
                   variant="ghost"
                   className={cn(
-                    "w-full justify-start gap-3 rounded-xl h-11 px-3",
+                    "w-full justify-start gap-3 rounded-xl h-11 px-3 transition-all",
                     "hover:bg-sidebar-accent text-sidebar-foreground",
-                    selectedListId === list.id && "bg-sidebar-accent"
+                    selectedListId === list.id && "bg-sidebar-accent",
+                    dragOverListId === list.id && "bg-primary/20 ring-2 ring-primary ring-inset"
                   )}
                   onClick={() => {
                     onSelectList(list.id);
@@ -390,6 +416,9 @@ export function AppSidebar({
                     <List className="h-3.5 w-3.5" style={{ color: list.color }} />
                   </div>
                   <span className="flex-1 text-left truncate">{list.name}</span>
+                  {dragOverListId === list.id && (
+                    <span className="text-xs text-primary font-medium">Drop here</span>
+                  )}
                 </Button>
 
                 <DropdownMenu>

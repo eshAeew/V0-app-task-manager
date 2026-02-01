@@ -786,6 +786,25 @@ export default function TaskManager() {
     }
   };
 
+  const handleDropTaskToList = (taskId: string, listId: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    const list = customLists.find((l) => l.id === listId);
+    if (task && list) {
+      // Get the first status for the target list (or use current status if compatible)
+      const listColumns = list.columns && list.columns.length > 0 ? list.columns : columns;
+      const targetStatus = listColumns.some((c) => c.id === task.status) 
+        ? task.status 
+        : listColumns[0]?.id || task.status;
+      
+      setTasks(tasks.map((t) => 
+        t.id === taskId ? { ...t, listId, status: targetStatus } : t
+      ));
+      setDraggedTaskId(null);
+      showToast("Task moved to list", `"${task.title}" added to "${list.name}"`);
+      addActivityLog("Task Added to List", `Moved "${task.title}" to list "${list.name}"`);
+    }
+  };
+
   const toggleSortOrder = () => {
     setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
   };
@@ -1133,11 +1152,12 @@ export default function TaskManager() {
             onUpdateColumn={handleUpdateColumn}
             onDeleteColumn={handleDeleteColumn}
             selectedStatus={selectedStatus}
-            onStatusSelect={handleStatusSelect}
-            onAddListColumn={handleAddListColumn}
-            onUpdateListColumn={handleUpdateListColumn}
-            onDeleteListColumn={handleDeleteListColumn}
-          />
+  onStatusSelect={handleStatusSelect}
+  onAddListColumn={handleAddListColumn}
+  onUpdateListColumn={handleUpdateListColumn}
+  onDeleteListColumn={handleDeleteListColumn}
+  onDropTaskToList={handleDropTaskToList}
+  />
         </div>
 
         <main className="flex-1 p-6 overflow-x-auto print:p-0">
