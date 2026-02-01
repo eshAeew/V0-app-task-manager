@@ -447,7 +447,7 @@ export function AppSidebar({
                   <Button
                     variant="ghost"
                     className={cn(
-                      "w-full justify-start gap-3 rounded-xl h-11 px-3",
+                      "w-full justify-start gap-3 rounded-xl h-11 px-3 pr-9",
                       "hover:bg-sidebar-accent text-sidebar-foreground",
                       selectedCategory === category.id && "bg-sidebar-accent"
                     )}
@@ -466,8 +466,8 @@ export function AppSidebar({
                         style={{ color: category.color }}
                       />
                     </div>
-                    <span className="flex-1 text-left">{category.name}</span>
-                    <span className="text-xs text-sidebar-foreground/50">{count}</span>
+                    <span className="flex-1 text-left truncate">{category.name}</span>
+                    <span className="text-xs text-sidebar-foreground/50 shrink-0">{count}</span>
                   </Button>
 
                   <DropdownMenu>
