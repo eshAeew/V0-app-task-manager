@@ -95,6 +95,133 @@ const DEFAULT_TEMPLATES: TaskTemplate[] = [
     category: "work",
     tags: ["meeting"],
   },
+  {
+    id: "template-4",
+    name: "Code Review",
+    title: "Review: ",
+    description: "PR/MR Link:\n\nReview Checklist:\n- Code quality\n- Tests included\n- Documentation updated\n\nComments:",
+    priority: "medium",
+    category: "development",
+    tags: ["review", "code"],
+    subtasks: [
+      { id: "s1", title: "Read through changes", completed: false },
+      { id: "s2", title: "Test locally", completed: false },
+      { id: "s3", title: "Leave feedback", completed: false },
+      { id: "s4", title: "Approve or request changes", completed: false },
+    ],
+    timeEstimate: 30,
+  },
+  {
+    id: "template-5",
+    name: "Research Task",
+    title: "Research: ",
+    description: "Topic:\n\nObjectives:\n\nSources to explore:\n\nFindings:",
+    priority: "medium",
+    category: "work",
+    tags: ["research"],
+    subtasks: [
+      { id: "s1", title: "Define research scope", completed: false },
+      { id: "s2", title: "Gather resources", completed: false },
+      { id: "s3", title: "Analyze findings", completed: false },
+      { id: "s4", title: "Document conclusions", completed: false },
+    ],
+    timeEstimate: 60,
+  },
+  {
+    id: "template-6",
+    name: "Design Task",
+    title: "Design: ",
+    description: "Design brief:\n\nRequirements:\n\nDeliverables:",
+    priority: "medium",
+    category: "design",
+    tags: ["design", "ui"],
+    subtasks: [
+      { id: "s1", title: "Review requirements", completed: false },
+      { id: "s2", title: "Create wireframes", completed: false },
+      { id: "s3", title: "Design mockups", completed: false },
+      { id: "s4", title: "Get feedback", completed: false },
+      { id: "s5", title: "Finalize designs", completed: false },
+    ],
+    timeEstimate: 120,
+  },
+  {
+    id: "template-7",
+    name: "Weekly Review",
+    title: "Weekly Review - ",
+    description: "What went well:\n\nWhat could improve:\n\nKey learnings:\n\nGoals for next week:",
+    priority: "low",
+    category: "personal",
+    tags: ["review", "weekly"],
+    recurrence: "weekly",
+  },
+  {
+    id: "template-8",
+    name: "Client Call",
+    title: "Call with: ",
+    description: "Client:\n\nPurpose:\n\nDiscussion points:\n\nFollow-up actions:",
+    priority: "high",
+    category: "work",
+    tags: ["client", "call"],
+    subtasks: [
+      { id: "s1", title: "Prepare agenda", completed: false },
+      { id: "s2", title: "Review previous notes", completed: false },
+      { id: "s3", title: "Conduct call", completed: false },
+      { id: "s4", title: "Send follow-up email", completed: false },
+    ],
+    timeEstimate: 45,
+  },
+  {
+    id: "template-9",
+    name: "Sprint Planning",
+    title: "Sprint: ",
+    description: "Sprint Goal:\n\nCapacity:\n\nCarryover items:\n\nNew items:",
+    priority: "medium",
+    category: "work",
+    tags: ["sprint", "planning"],
+    subtasks: [
+      { id: "s1", title: "Review backlog", completed: false },
+      { id: "s2", title: "Estimate stories", completed: false },
+      { id: "s3", title: "Commit to sprint goal", completed: false },
+      { id: "s4", title: "Update board", completed: false },
+    ],
+    timeEstimate: 60,
+    recurrence: "weekly",
+  },
+  {
+    id: "template-10",
+    name: "Documentation",
+    title: "Document: ",
+    description: "Topic:\n\nAudience:\n\nOutline:\n\nKey sections:",
+    priority: "low",
+    category: "development",
+    tags: ["docs", "documentation"],
+    subtasks: [
+      { id: "s1", title: "Outline structure", completed: false },
+      { id: "s2", title: "Write first draft", completed: false },
+      { id: "s3", title: "Add examples", completed: false },
+      { id: "s4", title: "Review and edit", completed: false },
+    ],
+    timeEstimate: 90,
+  },
+  {
+    id: "template-11",
+    name: "Quick Task",
+    title: "",
+    description: "",
+    priority: "medium",
+    category: "work",
+    tags: [],
+    timeEstimate: 15,
+  },
+  {
+    id: "template-12",
+    name: "Personal Errand",
+    title: "",
+    description: "",
+    priority: "low",
+    category: "personal",
+    tags: ["errand"],
+  },
 ];
 
 export default function TaskManager() {
@@ -361,10 +488,13 @@ export default function TaskManager() {
     const counts: Record<string, number> = {};
     tasks.filter((t) => !t.isArchived && !t.isDeleted).forEach((task) => {
       counts[task.category] = (counts[task.category] || 0) + 1;
-      counts[task.status] = (counts[task.status] || 0) + 1;
+      // For status counts, only count tasks in the selected list if a list is selected
+      if (!selectedListId || task.listId === selectedListId) {
+        counts[task.status] = (counts[task.status] || 0) + 1;
+      }
     });
     return counts;
-  }, [tasks]);
+  }, [tasks, selectedListId]);
 
   const favoriteCount = tasks.filter((t) => t.isFavorite && !t.isArchived && !t.isDeleted).length;
   const archivedCount = tasks.filter((t) => t.isArchived && !t.isDeleted).length;
@@ -409,7 +539,12 @@ export default function TaskManager() {
 
   const handleNewTask = () => {
     setEditingTask(null);
-    setDefaultStatus("todo");
+    // Use first status from active columns (list-specific or global)
+    const selectedList = customLists.find((l) => l.id === selectedListId);
+    const firstStatus = (selectedListId && selectedList?.columns?.length) 
+      ? selectedList.columns[0].id 
+      : columns[0]?.id || "todo";
+    setDefaultStatus(firstStatus);
     setDefaultDueDate(undefined);
     setDialogOpen(true);
   };
@@ -814,6 +949,82 @@ export default function TaskManager() {
     addActivityLog("Status Deleted", `Deleted status: ${column.title}`);
   };
 
+  // List-specific column/status management
+  const handleAddListColumn = (listId: string, column: Column) => {
+    setCustomLists(customLists.map((list) => {
+      if (list.id === listId) {
+        const existingColumns = list.columns || [];
+        return { ...list, columns: [...existingColumns, column] };
+      }
+      return list;
+    }));
+    const list = customLists.find((l) => l.id === listId);
+    showToast("Status created", `${column.title} added to "${list?.name}"`);
+    addActivityLog("List Status Created", `Created "${column.title}" in list "${list?.name}"`);
+  };
+
+  const handleUpdateListColumn = (listId: string, column: Column) => {
+    setCustomLists(customLists.map((list) => {
+      if (list.id === listId && list.columns) {
+        return {
+          ...list,
+          columns: list.columns.map((c) => (c.id === column.id ? column : c)),
+        };
+      }
+      return list;
+    }));
+    showToast("Status updated", column.title);
+    addActivityLog("List Status Updated", `Updated status: ${column.title}`);
+  };
+
+  const handleDeleteListColumn = (listId: string, columnId: string) => {
+    const list = customLists.find((l) => l.id === listId);
+    const listColumns = list?.columns || [];
+    const column = listColumns.find((c) => c.id === columnId);
+    
+    if (!column || listColumns.length <= 1) {
+      showToast("Cannot delete", "At least one status is required");
+      return;
+    }
+    
+    const remainingColumns = listColumns.filter((c) => c.id !== columnId);
+    const targetColumn = remainingColumns[0];
+    
+    setCustomLists(customLists.map((l) => {
+      if (l.id === listId) {
+        return { ...l, columns: remainingColumns };
+      }
+      return l;
+    }));
+    
+    // Move tasks with this status to the first remaining status
+    setTasks(tasks.map((t) => 
+      t.listId === listId && t.status === columnId 
+        ? { ...t, status: targetColumn.id } 
+        : t
+    ));
+    
+    if (selectedStatus === columnId) setSelectedStatus(null);
+    showToast("Status deleted", `${column.title}. Tasks moved to ${targetColumn.title}`);
+    addActivityLog("List Status Deleted", `Deleted status: ${column.title}`);
+  };
+
+  // Template management
+  const handleAddTemplate = (template: TaskTemplate) => {
+    setTemplates([...templates, template]);
+    showToast("Template created", template.name);
+    addActivityLog("Template Created" as any, `Created template: ${template.name}`);
+  };
+
+  const handleDeleteTemplate = (templateId: string) => {
+    const template = templates.find((t) => t.id === templateId);
+    setTemplates(templates.filter((t) => t.id !== templateId));
+    if (template) {
+      showToast("Template deleted", template.name);
+      addActivityLog("Template Deleted" as any, `Deleted template: ${template.name}`);
+    }
+  };
+
   // Notification management
   const handleMarkNotificationRead = (id: string) => {
     setNotifications(
@@ -859,6 +1070,15 @@ export default function TaskManager() {
 
   // Check if any filters are active
   const hasActiveFilters = selectedCategory || selectedListId || selectedStatus || filterPriority !== "all" || searchQuery;
+
+  // Get active columns: use list-specific columns if a list is selected and has columns, otherwise use global columns
+  const selectedList = customLists.find((l) => l.id === selectedListId);
+  const activeColumns = useMemo(() => {
+    if (selectedListId && selectedList?.columns && selectedList.columns.length > 0) {
+      return selectedList.columns;
+    }
+    return columns;
+  }, [selectedListId, selectedList?.columns, columns]);
 
   // Show loading state
   if (!isHydrated) {
@@ -914,6 +1134,9 @@ export default function TaskManager() {
             onDeleteColumn={handleDeleteColumn}
             selectedStatus={selectedStatus}
             onStatusSelect={handleStatusSelect}
+            onAddListColumn={handleAddListColumn}
+            onUpdateListColumn={handleUpdateListColumn}
+            onDeleteListColumn={handleDeleteListColumn}
           />
         </div>
 
@@ -1164,7 +1387,7 @@ export default function TaskManager() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent className="rounded-xl">
-                        {columns.map((col) => (
+                        {activeColumns.map((col) => (
                           <DropdownMenuItem
                             key={col.id}
                             onClick={() => handleBulkMove(col.id)}
@@ -1206,7 +1429,7 @@ export default function TaskManager() {
 
                 {/* Kanban Board */}
                 <div className="flex gap-6 print:block print:space-y-4">
-                  {columns.map((column) => (
+                  {activeColumns.map((column) => (
                     <KanbanColumn
                       key={column.id}
                       column={column}
@@ -1301,19 +1524,21 @@ export default function TaskManager() {
       </div>
 
       {/* Task Dialog */}
-      <TaskDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        task={editingTask}
-        defaultStatus={defaultStatus}
-        defaultDueDate={defaultDueDate}
-        defaultListId={selectedListId || undefined}
-        onSave={handleSaveTask}
-        customLists={customLists}
-        categories={categories}
-        columns={columns}
-        templates={templates}
-      />
+<TaskDialog
+  open={dialogOpen}
+  onOpenChange={setDialogOpen}
+  task={editingTask}
+  defaultStatus={defaultStatus}
+  defaultDueDate={defaultDueDate}
+  defaultListId={selectedListId || undefined}
+  onSave={handleSaveTask}
+  customLists={customLists}
+  categories={categories}
+  columns={activeColumns}
+  templates={templates}
+  onAddTemplate={handleAddTemplate}
+  onDeleteTemplate={handleDeleteTemplate}
+  />
 
       {/* Keyboard Shortcuts Dialog */}
       <Dialog open={showKeyboardShortcuts} onOpenChange={setShowKeyboardShortcuts}>
