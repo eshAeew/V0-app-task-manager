@@ -24,7 +24,14 @@ import {
   Trash2,
   CheckCircle2,
   Circle,
+  Eye,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,6 +48,7 @@ import {
 } from "@/components/ui/context-menu";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { ViewTaskDialog } from "@/components/view-task-dialog";
 
 interface TaskCardProps {
   task: Task;
@@ -81,11 +89,13 @@ export function TaskCard({
   isCompact = false,
   searchQuery = "",
   categories = DEFAULT_CATEGORIES,
+  columns = [],
 }: TaskCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isInlineEditing, setIsInlineEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
   const [expandedSubtasks, setExpandedSubtasks] = useState(false);
+  const [showViewDialog, setShowViewDialog] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const priority = PRIORITIES.find((p) => p.value === task.priority);
@@ -283,6 +293,10 @@ export function TaskCard({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48 rounded-xl">
+            <DropdownMenuItem onClick={() => setShowViewDialog(true)}>
+              <Eye className="h-4 w-4 mr-2" />
+              View Details
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onEdit(task)}>
               Edit task
             </DropdownMenuItem>
@@ -316,10 +330,26 @@ export function TaskCard({
 
       {/* Description with markdown - hide in compact mode */}
       {!isCompact && task.description && (
-        <div 
-          className={cn("text-xs text-muted-foreground line-clamp-2 mb-3 prose prose-sm prose-slate dark:prose-invert max-w-none", isSelectionMode ? "pl-8" : "pl-4")}
-          dangerouslySetInnerHTML={{ __html: parseMarkdown(task.description) }}
-        />
+        <TooltipProvider delayDuration={700}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div 
+                className={cn("text-xs text-muted-foreground line-clamp-2 mb-3 prose prose-sm prose-slate dark:prose-invert max-w-none cursor-default", isSelectionMode ? "pl-8" : "pl-4")}
+                dangerouslySetInnerHTML={{ __html: parseMarkdown(task.description) }}
+              />
+            </TooltipTrigger>
+            <TooltipContent 
+              side="bottom" 
+              align="start"
+              className="max-w-sm p-3 text-sm bg-popover border shadow-lg rounded-xl"
+            >
+              <div 
+                className="prose prose-sm prose-slate dark:prose-invert max-w-none"
+                dangerouslySetInnerHTML={{ __html: parseMarkdown(task.description) }}
+              />
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       )}
 
       {/* Subtasks Progress */}
@@ -457,6 +487,10 @@ export function TaskCard({
     <ContextMenu>
       <ContextMenuTrigger>{cardContent}</ContextMenuTrigger>
       <ContextMenuContent className="w-48 rounded-xl">
+        <ContextMenuItem onClick={() => setShowViewDialog(true)}>
+          <Eye className="h-4 w-4 mr-2" />
+          View Details
+        </ContextMenuItem>
         <ContextMenuItem onClick={() => onEdit(task)}>
           Edit task
         </ContextMenuItem>
@@ -485,6 +519,17 @@ export function TaskCard({
           Delete
         </ContextMenuItem>
       </ContextMenuContent>
+
+      {/* View Task Dialog */}
+      <ViewTaskDialog
+        task={task}
+        open={showViewDialog}
+        onOpenChange={setShowViewDialog}
+        onToggleSubtask={onToggleSubtask}
+        onMarkComplete={onMarkComplete}
+        categories={categories}
+        columns={columns}
+      />
     </ContextMenu>
   );
 }

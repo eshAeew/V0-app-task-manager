@@ -44,6 +44,7 @@ interface KanbanColumnProps {
   searchQuery?: string;
   categories?: Category[];
   onMarkComplete?: (taskId: string) => void;
+  columns?: Column[];
 }
 
 const priorityOrder: Record<Priority, number> = {
@@ -79,6 +80,7 @@ export function KanbanColumn({
   searchQuery = "",
   categories = DEFAULT_CATEGORIES,
   onMarkComplete,
+  columns = [],
 }: KanbanColumnProps) {
   const [isDropTarget, setIsDropTarget] = useState(false);
   const [sortType, setSortType] = useState<"none" | "priority" | "dueDate">("none");
@@ -269,10 +271,11 @@ export function KanbanColumn({
                 isSelected={selectedTaskIds.includes(task.id)}
                 onSelect={onSelectTask}
                 isSelectionMode={isSelectionMode}
-                isCompact={isCompact}
-                searchQuery={searchQuery}
-                categories={categories}
-              />
+  isCompact={isCompact}
+  searchQuery={searchQuery}
+  categories={categories}
+  columns={columns}
+  />
             </div>
           ))}
         </AnimatePresence>

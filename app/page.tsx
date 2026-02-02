@@ -1714,6 +1714,7 @@ export default function TaskManager() {
                         searchQuery={searchQuery}
                         categories={categories}
                         onMarkComplete={handleMarkComplete}
+                        columns={activeColumns}
                       />
                     </div>
                   ))}
