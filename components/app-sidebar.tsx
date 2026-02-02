@@ -653,7 +653,7 @@ export function AppSidebar({
                   <Button
                     variant="ghost"
                     className={cn(
-                      "w-full justify-start gap-3 rounded-xl h-10 px-3 pr-9",
+                      "w-full justify-start gap-2 rounded-xl h-10 px-3 pr-10",
                       "hover:bg-sidebar-accent text-sidebar-foreground",
                       selectedStatus === column.id && "bg-sidebar-accent"
                     )}
@@ -680,7 +680,7 @@ export function AppSidebar({
                     {column.isCompletionStatus && (
                       <span className="text-[10px] text-emerald-500 font-medium shrink-0">Done</span>
                     )}
-                    <span className="text-xs text-sidebar-foreground/50 shrink-0">
+                    <span className="text-xs text-sidebar-foreground/50 shrink-0 mr-1">
                       {taskCounts[column.id] || 0}
                     </span>
                   </Button>
