@@ -653,7 +653,7 @@ export function AppSidebar({
                   <Button
                     variant="ghost"
                     className={cn(
-                      "w-full justify-start gap-2 rounded-xl h-10 px-3 pr-10",
+                      "w-full justify-start gap-2 rounded-xl h-10 px-3 pr-8",
                       "hover:bg-sidebar-accent text-sidebar-foreground",
                       selectedStatus === column.id && "bg-sidebar-accent"
                     )}
@@ -680,17 +680,19 @@ export function AppSidebar({
                     {column.isCompletionStatus && (
                       <span className="text-[10px] text-emerald-500 font-medium shrink-0">Done</span>
                     )}
-                    <span className="text-xs text-sidebar-foreground/50 shrink-0 group-hover:opacity-0 transition-opacity">
-                      {taskCounts[column.id] || 0}
-                    </span>
                   </Button>
+
+                  {/* Task count - shows when not hovered */}
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-sidebar-foreground/50 group-hover:opacity-0 transition-opacity pointer-events-none">
+                    {taskCounts[column.id] || 0}
+                  </span>
 
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-sidebar-accent/50"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-sidebar-accent/50"
                       >
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>

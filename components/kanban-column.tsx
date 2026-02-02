@@ -129,8 +129,6 @@ export function KanbanColumn({
     ? sortedTasks.slice(0, COLLAPSED_TASK_LIMIT) 
     : sortedTasks;
 
-  console.log("[v0] Column:", column.title, "| Total tasks:", tasks.length, "| hasMoreTasks:", hasMoreTasks, "| isExpanded:", isExpanded, "| Visible:", visibleTasks.length);
-
   if (isCollapsed) {
     return (
       <div
