@@ -81,6 +81,7 @@ export function TaskCard({
   const [isHovered, setIsHovered] = useState(false);
   const [isInlineEditing, setIsInlineEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
+  const [expandedSubtasks, setExpandedSubtasks] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const priority = PRIORITIES.find((p) => p.value === task.priority);
@@ -294,48 +295,54 @@ export function TaskCard({
         />
       )}
 
-      {/* Subtasks Progress */}
-      {totalSubtasks > 0 && (
-        <div className={cn("mb-3", isSelectionMode ? "pl-8" : "pl-4")}>
-          <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
-            <span>Subtasks</span>
-            <span>
-              {completedSubtasks}/{totalSubtasks}
-            </span>
-          </div>
-          <Progress value={progress} className="h-1.5 mb-2" />
-          {/* Show subtask list - hide in compact mode */}
-          {!isCompact && (
-            <div className="space-y-1.5">
-              {task.subtasks?.slice(0, 3).map((subtask) => (
-                <label 
-                  key={subtask.id} 
-                  className="flex items-center gap-2 text-xs cursor-pointer group/subtask hover:bg-muted/50 rounded-md p-1 -m-1 transition-colors"
-                >
-                  <Checkbox
-                    checked={subtask.completed}
-                    onCheckedChange={() => onToggleSubtask?.(task.id, subtask.id)}
-                    className="h-3.5 w-3.5 cursor-pointer hover:border-primary transition-colors data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                  />
-                  <span
-                    className={cn(
-                      "truncate transition-colors",
-                      subtask.completed && "line-through text-muted-foreground"
-                    )}
-                  >
-                    {subtask.title}
-                  </span>
-                </label>
-              ))}
-              {totalSubtasks > 3 && (
-                <p className="text-xs text-muted-foreground">
-                  +{totalSubtasks - 3} more
-                </p>
-              )}
+        {/* Subtasks Progress */}
+        {totalSubtasks > 0 && (
+          <div className={cn("mb-3", isSelectionMode ? "pl-8" : "pl-4")}>
+            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+              <span>Subtasks</span>
+              <span>
+                {completedSubtasks}/{totalSubtasks}
+              </span>
             </div>
-          )}
-        </div>
-      )}
+            <Progress value={progress} className="h-1.5 mb-2" />
+            {/* Show subtask list - hide in compact mode */}
+            {!isCompact && (
+              <div className="space-y-1.5">
+                {task.subtasks?.slice(0, expandedSubtasks ? undefined : 3).map((subtask) => (
+                  <label 
+                    key={subtask.id} 
+                    className="flex items-center gap-2 text-xs cursor-pointer group/subtask hover:bg-muted/50 rounded-md p-1 -m-1 transition-colors"
+                  >
+                    <Checkbox
+                      checked={subtask.completed}
+                      onCheckedChange={() => onToggleSubtask?.(task.id, subtask.id)}
+                      className="h-3.5 w-3.5 cursor-pointer hover:border-primary transition-colors data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                    />
+                    <span
+                      className={cn(
+                        "truncate transition-colors flex-1",
+                        subtask.completed && "line-through text-muted-foreground"
+                      )}
+                    >
+                      {subtask.title}
+                    </span>
+                  </label>
+                ))}
+                {totalSubtasks > 3 && (
+                  <button
+                    onClick={() => setExpandedSubtasks(!expandedSubtasks)}
+                    className="text-xs text-primary hover:text-primary/80 transition-colors font-medium py-1 px-1 -m-1 rounded hover:bg-primary/5"
+                  >
+                    {expandedSubtasks 
+                      ? "Show less" 
+                      : `+${totalSubtasks - 3} more`
+                    }
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
       {/* Tags - hide in compact mode */}
       {!isCompact && task.tags.length > 0 && (
