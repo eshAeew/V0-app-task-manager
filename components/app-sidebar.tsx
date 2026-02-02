@@ -42,6 +42,7 @@ import {
   ChevronDown,
   ChevronRight,
   GripVertical,
+  CheckCircle2,
 } from "lucide-react";
 import {
   Collapsible,
@@ -623,11 +624,18 @@ export function AppSidebar({
                     }}
                   >
                     <GripVertical className="h-3 w-3 text-sidebar-foreground/30 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab" />
-                    <div 
-                      className="w-2 h-2 rounded-full" 
-                      style={{ backgroundColor: column.color }}
-                    />
+                    {column.isCompletionStatus ? (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                    ) : (
+                      <div 
+                        className="w-2 h-2 rounded-full shrink-0" 
+                        style={{ backgroundColor: column.color }}
+                      />
+                    )}
                     <span className="text-sm flex-1 text-left truncate">{column.title}</span>
+                    {column.isCompletionStatus && (
+                      <span className="text-[10px] text-emerald-500 font-medium shrink-0">Done</span>
+                    )}
                     <span className="text-xs text-sidebar-foreground/50 shrink-0">
                       {taskCounts[column.id] || 0}
                     </span>

@@ -8,7 +8,7 @@ import { DEFAULT_CATEGORIES } from "@/lib/types";
 import { TaskCard } from "./task-card";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Plus, MoreHorizontal, ChevronDown, ChevronRight, ArrowUpDown, Layers } from "lucide-react";
+import { Plus, MoreHorizontal, ChevronDown, ChevronRight, ArrowUpDown, Layers, CheckCircle2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -78,6 +78,7 @@ export function KanbanColumn({
   isCompact = false,
   searchQuery = "",
   categories = DEFAULT_CATEGORIES,
+  onMarkComplete,
 }: KanbanColumnProps) {
   const [isDropTarget, setIsDropTarget] = useState(false);
   const [sortType, setSortType] = useState<"none" | "priority" | "dueDate">("none");
@@ -125,10 +126,14 @@ export function KanbanColumn({
         onClick={() => onToggleCollapse?.(column.id)}
       >
         <div className="flex flex-col items-center py-4 gap-3">
-          <div 
-            className="w-3 h-3 rounded-full" 
-            style={{ backgroundColor: column.color }}
-          />
+          {column.isCompletionStatus ? (
+            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+          ) : (
+            <div 
+              className="w-3 h-3 rounded-full" 
+              style={{ backgroundColor: column.color }}
+            />
+          )}
           <span className="text-xs font-medium text-foreground writing-vertical transform rotate-180" style={{ writingMode: "vertical-rl" }}>
             {column.title}
           </span>
@@ -162,11 +167,18 @@ export function KanbanColumn({
           >
             <ChevronDown className="w-4 h-4 text-muted-foreground" />
           </button>
-          <div 
-            className="w-3 h-3 rounded-full shrink-0" 
-            style={{ backgroundColor: column.color }}
-          />
-          <h2 className="font-semibold text-foreground truncate">{column.title}</h2>
+          {column.isCompletionStatus ? (
+            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+          ) : (
+            <div 
+              className="w-3 h-3 rounded-full shrink-0" 
+              style={{ backgroundColor: column.color }}
+            />
+          )}
+          <h2 className="font-semibold text-foreground truncate">
+            {column.title}
+            {column.isCompletionStatus && <span className="text-xs text-emerald-500 ml-1 font-normal">(Done)</span>}
+          </h2>
           <span className="flex items-center justify-center w-6 h-6 rounded-full bg-secondary text-secondary-foreground text-xs font-medium shrink-0">
             {tasks.length}
           </span>
@@ -250,6 +262,7 @@ export function KanbanColumn({
                 onDuplicate={onDuplicate}
                 onTogglePin={onTogglePin}
                 onInlineEdit={onInlineEdit}
+                onMarkComplete={onMarkComplete}
                 isDragging={draggedTaskId === task.id}
                 isSelected={selectedTaskIds.includes(task.id)}
                 onSelect={onSelectTask}

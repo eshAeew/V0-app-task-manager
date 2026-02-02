@@ -500,7 +500,11 @@ export default function TaskManager() {
   const archivedCount = tasks.filter((t) => t.isArchived && !t.isDeleted).length;
   const trashCount = tasks.filter((t) => t.isDeleted).length;
   const totalTasks = tasks.filter((t) => !t.isArchived && !t.isDeleted).length;
-  const completedCount = tasks.filter((t) => t.status === "done" && !t.isArchived && !t.isDeleted).length;
+  // Count tasks that are either explicitly completed OR in a completion status column
+  const completionStatusIds = columns.filter(c => c.isCompletionStatus).map(c => c.id);
+  const completedCount = tasks.filter((t) => 
+    !t.isArchived && !t.isDeleted && (t.isCompleted || completionStatusIds.includes(t.status))
+  ).length;
 
   // Clear other filters when selecting
   const handleCategorySelect = (categoryId: string | null) => {
@@ -1547,10 +1551,11 @@ export default function TaskManager() {
                       isSelectionMode={isSelectionMode}
                       selectedTaskIds={selectedTaskIds}
                       onSelectTask={handleSelectTask}
-                      isCompact={isCompactView}
-                      searchQuery={searchQuery}
-                      categories={categories}
-                    />
+  isCompact={isCompactView}
+  searchQuery={searchQuery}
+  categories={categories}
+  onMarkComplete={handleMarkComplete}
+  />
                   ))}
                 </div>
               </motion.div>
