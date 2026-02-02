@@ -500,7 +500,11 @@ export default function TaskManager() {
   const archivedCount = tasks.filter((t) => t.isArchived && !t.isDeleted).length;
   const trashCount = tasks.filter((t) => t.isDeleted).length;
   const totalTasks = tasks.filter((t) => !t.isArchived && !t.isDeleted).length;
-  const completedCount = tasks.filter((t) => t.status === "done" && !t.isArchived && !t.isDeleted).length;
+  // Count tasks that are either explicitly completed OR in a completion status column
+  const completionStatusIds = columns.filter(c => c.isCompletionStatus).map(c => c.id);
+  const completedCount = tasks.filter((t) => 
+    !t.isArchived && !t.isDeleted && (t.isCompleted || completionStatusIds.includes(t.status))
+  ).length;
 
   // Clear other filters when selecting
   const handleCategorySelect = (categoryId: string | null) => {
@@ -772,17 +776,50 @@ export default function TaskManager() {
     e.preventDefault();
   };
 
+  const handleMarkComplete = (taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (task) {
+      const newCompleted = !task.isCompleted;
+      setTasks(tasks.map((t) => 
+        t.id === taskId 
+          ? { 
+              ...t, 
+              isCompleted: newCompleted,
+              completedAt: newCompleted ? new Date().toISOString() : undefined,
+            } 
+          : t
+      ));
+      showToast(
+        newCompleted ? "Task completed" : "Task reopened", 
+        task.title
+      );
+      addActivityLog(
+        newCompleted ? "Task Completed" : "Task Reopened", 
+        task.title
+      );
+    }
+  };
+
   const handleDrop = (e: React.DragEvent, status: Status) => {
     e.preventDefault();
     const taskId = e.dataTransfer.getData("taskId");
     const task = tasks.find((t) => t.id === taskId);
     const oldStatus = task?.status;
-    setTasks(tasks.map((t) => (t.id === taskId ? { ...t, status } : t)));
+    
+    // Check if target status is a completion status
+    const targetColumn = columns.find((c) => c.id === status);
+    const isCompletionStatus = targetColumn?.isCompletionStatus || false;
+    
+    setTasks(tasks.map((t) => (t.id === taskId ? { 
+      ...t, 
+      status,
+      isCompleted: isCompletionStatus ? true : t.isCompleted,
+      completedAt: isCompletionStatus && !t.isCompleted ? new Date().toISOString() : t.completedAt,
+    } : t)));
     setDraggedTaskId(null);
     if (task && oldStatus !== status) {
-      const column = columns.find((c) => c.id === status);
-      showToast("Task moved", `${task.title} moved to ${column?.title}`);
-      addActivityLog("Task Moved", `Moved "${task.title}" to ${column?.title || status}`);
+      showToast("Task moved", `${task.title} moved to ${targetColumn?.title}`);
+      addActivityLog("Task Moved", `Moved "${task.title}" to ${targetColumn?.title || status}`);
     }
   };
 
@@ -1270,7 +1307,7 @@ export default function TaskManager() {
                 className="min-w-max"
               >
                 {/* Board Header */}
-                <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 print:hidden">
+                <div className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 print:hidden">
                   <div>
                     <h2 className="text-2xl font-bold text-foreground">
                       {getViewTitle()}
@@ -1289,39 +1326,67 @@ export default function TaskManager() {
                       )}
                     </p>
                   </div>
+                </div>
 
-                  {/* Controls */}
-                  <div className="flex items-center gap-2 flex-wrap">
+                {/* Draggable Floating Toolbar */}
+                <motion.div 
+                  drag
+                  dragMomentum={false}
+                  dragElastic={0}
+                  whileDrag={{ scale: 1.02, cursor: "grabbing" }}
+                  initial={{ x: "-50%", y: 0 }}
+                  className="fixed bottom-6 left-1/2 z-50 print:hidden cursor-grab active:cursor-grabbing"
+                >
+                  <div className="flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-card/95 backdrop-blur-xl border border-border shadow-2xl shadow-black/20 dark:shadow-black/40">
+                    {/* Drag Handle */}
+                    <div className="flex items-center gap-1 pr-2 border-r border-border mr-1">
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex gap-0.5">
+                          <div className="w-1 h-1 rounded-full bg-muted-foreground/40" />
+                          <div className="w-1 h-1 rounded-full bg-muted-foreground/40" />
+                        </div>
+                        <div className="flex gap-0.5">
+                          <div className="w-1 h-1 rounded-full bg-muted-foreground/40" />
+                          <div className="w-1 h-1 rounded-full bg-muted-foreground/40" />
+                        </div>
+                        <div className="flex gap-0.5">
+                          <div className="w-1 h-1 rounded-full bg-muted-foreground/40" />
+                          <div className="w-1 h-1 rounded-full bg-muted-foreground/40" />
+                        </div>
+                      </div>
+                    </div>
                     {/* Selection Mode Toggle */}
                     <Button
-                      variant={isSelectionMode ? "default" : "outline"}
+                      variant={isSelectionMode ? "default" : "ghost"}
                       size="sm"
-                      className="rounded-xl h-9 gap-2"
+                      className="rounded-xl h-8 gap-2 text-xs"
                       onClick={() => {
                         setIsSelectionMode(!isSelectionMode);
                         if (isSelectionMode) setSelectedTaskIds([]);
                       }}
                     >
-                      <CheckSquare className="h-4 w-4" />
+                      <CheckSquare className="h-3.5 w-3.5" />
                       Select
                     </Button>
 
+                    <div className="w-px h-6 bg-border" />
+
                     {/* Compact View Toggle */}
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="icon"
-                      className="rounded-xl h-9 w-9 bg-transparent"
+                      className="rounded-xl h-8 w-8"
                       onClick={() => setIsCompactView(!isCompactView)}
                       title={isCompactView ? "Comfortable view" : "Compact view"}
                     >
-                      {isCompactView ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
+                      {isCompactView ? <Maximize2 className="h-3.5 w-3.5" /> : <Minimize2 className="h-3.5 w-3.5" />}
                     </Button>
 
                     {/* Sort Dropdown */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="outline" className="rounded-xl h-9 gap-2 bg-transparent">
-                          <ArrowUpDown className="h-4 w-4" />
+                        <Button variant="ghost" className="rounded-xl h-8 gap-2 text-xs">
+                          <ArrowUpDown className="h-3.5 w-3.5" />
                           <span className="hidden sm:inline">
                             {sortBy === "priority" ? "Priority" : sortBy === "dueDate" ? "Due Date" : sortBy === "title" ? "Title" : "Created"}
                           </span>
@@ -1345,20 +1410,22 @@ export default function TaskManager() {
 
                     {/* Sort Order Toggle */}
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="icon"
-                      className="rounded-xl h-9 w-9 bg-transparent"
+                      className="rounded-xl h-8 w-8"
                       onClick={toggleSortOrder}
                       title={sortOrder === "asc" ? "Ascending" : "Descending"}
                     >
-                      <SlidersHorizontal className={`h-4 w-4 transition-transform ${sortOrder === "asc" ? "rotate-180" : ""}`} />
+                      <SlidersHorizontal className={`h-3.5 w-3.5 transition-transform ${sortOrder === "asc" ? "rotate-180" : ""}`} />
                     </Button>
+
+                    <div className="w-px h-6 bg-border" />
 
                     {/* Filter by Priority */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="outline" className="rounded-xl h-9 gap-2 bg-transparent">
-                          <Filter className="h-4 w-4" />
+                        <Button variant="ghost" className="rounded-xl h-8 gap-2 text-xs">
+                          <Filter className="h-3.5 w-3.5" />
                           <span className="hidden sm:inline">
                             {filterPriority === "all" ? "All" : filterPriority.charAt(0).toUpperCase() + filterPriority.slice(1)}
                           </span>
@@ -1390,8 +1457,8 @@ export default function TaskManager() {
                     {/* More Actions */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="icon" className="rounded-xl h-9 w-9 bg-transparent">
-                          <LayoutGrid className="h-4 w-4" />
+                        <Button variant="ghost" size="icon" className="rounded-xl h-8 w-8">
+                          <LayoutGrid className="h-3.5 w-3.5" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="rounded-xl w-48">
@@ -1410,7 +1477,7 @@ export default function TaskManager() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
-                </div>
+                </motion.div>
 
                 {/* Bulk Actions Bar */}
                 {isSelectionMode && selectedTaskIds.length > 0 && (
@@ -1486,7 +1553,7 @@ export default function TaskManager() {
                 </div>
 
                 {/* Kanban Board */}
-                <div className="flex gap-6 print:block print:space-y-4">
+                <div className="flex gap-6 pb-20 print:block print:space-y-4 print:pb-0">
                   {activeColumns.map((column) => (
                     <KanbanColumn
                       key={column.id}
@@ -1514,10 +1581,11 @@ export default function TaskManager() {
                       isSelectionMode={isSelectionMode}
                       selectedTaskIds={selectedTaskIds}
                       onSelectTask={handleSelectTask}
-                      isCompact={isCompactView}
-                      searchQuery={searchQuery}
-                      categories={categories}
-                    />
+  isCompact={isCompactView}
+  searchQuery={searchQuery}
+  categories={categories}
+  onMarkComplete={handleMarkComplete}
+  />
                   ))}
                 </div>
               </motion.div>

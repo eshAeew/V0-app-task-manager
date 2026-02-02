@@ -9,6 +9,7 @@ import { generateId } from "@/lib/task-store";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import {
   Dialog,
@@ -41,6 +42,7 @@ import {
   ChevronDown,
   ChevronRight,
   GripVertical,
+  CheckCircle2,
 } from "lucide-react";
 import {
   Collapsible,
@@ -157,6 +159,7 @@ export function AppSidebar({
   const [editingColumn, setEditingColumn] = useState<Column | null>(null);
   const [newColumnName, setNewColumnName] = useState("");
   const [newColumnColor, setNewColumnColor] = useState(LIST_COLORS[0]);
+  const [newColumnIsCompletion, setNewColumnIsCompletion] = useState(false);
 
   const totalTasks = Object.values(taskCounts).reduce((a, b) => a + b, 0) / 2; // Divided by 2 because we count both category and status
   const completedTasks = taskCounts.done || 0;
@@ -260,6 +263,7 @@ export function AppSidebar({
         title: newColumnName.trim(),
         color: newColumnColor,
         isCustom: true,
+        isCompletionStatus: newColumnIsCompletion,
       };
       
       // If a list is selected, add column to that list
@@ -271,6 +275,7 @@ export function AppSidebar({
       
       setNewColumnName("");
       setNewColumnColor(LIST_COLORS[0]);
+      setNewColumnIsCompletion(false);
       setShowColumnDialog(false);
     }
   };
@@ -281,6 +286,7 @@ export function AppSidebar({
         ...editingColumn,
         title: newColumnName.trim(),
         color: newColumnColor,
+        isCompletionStatus: newColumnIsCompletion,
       };
       
       // If a list is selected and using list columns, update list column
@@ -293,6 +299,7 @@ export function AppSidebar({
       setEditingColumn(null);
       setNewColumnName("");
       setNewColumnColor(LIST_COLORS[0]);
+      setNewColumnIsCompletion(false);
     }
   };
 
@@ -309,6 +316,7 @@ export function AppSidebar({
     setEditingColumn(column);
     setNewColumnName(column.title);
     setNewColumnColor(column.color);
+    setNewColumnIsCompletion(column.isCompletionStatus || false);
   };
 
   return (
@@ -616,11 +624,18 @@ export function AppSidebar({
                     }}
                   >
                     <GripVertical className="h-3 w-3 text-sidebar-foreground/30 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab" />
-                    <div 
-                      className="w-2 h-2 rounded-full" 
-                      style={{ backgroundColor: column.color }}
-                    />
+                    {column.isCompletionStatus ? (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                    ) : (
+                      <div 
+                        className="w-2 h-2 rounded-full shrink-0" 
+                        style={{ backgroundColor: column.color }}
+                      />
+                    )}
                     <span className="text-sm flex-1 text-left truncate">{column.title}</span>
+                    {column.isCompletionStatus && (
+                      <span className="text-[10px] text-emerald-500 font-medium shrink-0">Done</span>
+                    )}
                     <span className="text-xs text-sidebar-foreground/50 shrink-0">
                       {taskCounts[column.id] || 0}
                     </span>
@@ -823,6 +838,7 @@ export function AppSidebar({
             setEditingColumn(null);
             setNewColumnName("");
             setNewColumnColor(LIST_COLORS[0]);
+            setNewColumnIsCompletion(false);
           }
         }}
       >
@@ -866,6 +882,22 @@ export function AppSidebar({
                     style={{ backgroundColor: color }}
                   />
                 ))}
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+              <Checkbox
+                id="completion-status"
+                checked={newColumnIsCompletion}
+                onCheckedChange={(checked) => setNewColumnIsCompletion(checked as boolean)}
+                className="data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
+              />
+              <div className="flex-1">
+                <label htmlFor="completion-status" className="text-sm font-medium cursor-pointer">
+                  Mark as completion status
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  Tasks moved to this status will be marked as completed
+                </p>
               </div>
             </div>
           </div>
