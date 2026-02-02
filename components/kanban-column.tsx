@@ -8,7 +8,7 @@ import { DEFAULT_CATEGORIES } from "@/lib/types";
 import { TaskCard } from "./task-card";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Plus, MoreHorizontal, ChevronDown, ChevronRight, ArrowUpDown, Layers, CheckCircle2, GripVertical } from "lucide-react";
+import { Plus, MoreHorizontal, ChevronDown, ChevronRight, ChevronUp, ArrowUpDown, Layers, CheckCircle2, GripVertical } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -84,6 +84,12 @@ export function KanbanColumn({
 }: KanbanColumnProps) {
   const [isDropTarget, setIsDropTarget] = useState(false);
   const [sortType, setSortType] = useState<"none" | "priority" | "dueDate">("none");
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  // Number of tasks to show when collapsed
+  const COLLAPSED_TASK_LIMIT = 5;
+  const hasMoreTasks = tasks.length > COLLAPSED_TASK_LIMIT;
+  const hiddenTaskCount = tasks.length - COLLAPSED_TASK_LIMIT;
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -117,6 +123,11 @@ export function KanbanColumn({
     }
     return 0;
   });
+
+  // Limit visible tasks when not expanded and there are many tasks
+  const visibleTasks = hasMoreTasks && !isExpanded 
+    ? sortedTasks.slice(0, COLLAPSED_TASK_LIMIT) 
+    : sortedTasks;
 
   if (isCollapsed) {
     return (
@@ -244,9 +255,12 @@ export function KanbanColumn({
       )}
 
       {/* Tasks Container */}
-      <div className="flex-1 p-3 pt-1 space-y-3 overflow-y-auto scrollbar-thin">
+      <div className={cn(
+        "flex-1 p-3 pt-1 space-y-3 overflow-y-auto scrollbar-thin",
+        isExpanded && hasMoreTasks && "max-h-[600px]"
+      )}>
         <AnimatePresence mode="popLayout">
-          {sortedTasks.map((task) => (
+          {visibleTasks.map((task) => (
             <div
               key={task.id}
               draggable={!isSelectionMode}
@@ -279,6 +293,38 @@ export function KanbanColumn({
             </div>
           ))}
         </AnimatePresence>
+
+        {/* Show More/Less Button */}
+        {hasMoreTasks && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="pt-1"
+          >
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "w-full justify-center text-xs text-muted-foreground",
+                "hover:text-foreground hover:bg-secondary/50 rounded-xl",
+                "border border-dashed border-border/50"
+              )}
+              onClick={() => setIsExpanded(!isExpanded)}
+            >
+              {isExpanded ? (
+                <>
+                  <ChevronUp className="h-3 w-3 mr-1" />
+                  Show less
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-3 w-3 mr-1" />
+                  Show {hiddenTaskCount} more task{hiddenTaskCount !== 1 ? 's' : ''}
+                </>
+              )}
+            </Button>
+          </motion.div>
+        )}
 
         {/* Empty State */}
         {tasks.length === 0 && (
