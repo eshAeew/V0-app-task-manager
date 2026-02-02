@@ -805,6 +805,43 @@ export default function TaskManager() {
     }
   };
 
+  const handleDropStatusToList = (statusId: string, listId: string) => {
+    const list = customLists.find((l) => l.id === listId);
+    const statusColumn = columns.find((c) => c.id === statusId);
+    if (list && statusColumn) {
+      // Find all tasks with this status that aren't already in the list
+      const tasksToMove = tasks.filter(
+        (t) => t.status === statusId && t.listId !== listId && !t.isDeleted && !t.isArchived
+      );
+      
+      if (tasksToMove.length === 0) {
+        showToast("No tasks to move", `No tasks with status "${statusColumn.title}" to move`);
+        return;
+      }
+
+      // Get target status for the list
+      const listColumns = list.columns && list.columns.length > 0 ? list.columns : columns;
+      const targetStatus = listColumns.some((c) => c.id === statusId) 
+        ? statusId 
+        : listColumns[0]?.id || statusId;
+      
+      setTasks(tasks.map((t) => 
+        tasksToMove.some((m) => m.id === t.id) 
+          ? { ...t, listId, status: targetStatus } 
+          : t
+      ));
+      
+      showToast(
+        "Tasks moved to list", 
+        `${tasksToMove.length} task${tasksToMove.length > 1 ? 's' : ''} from "${statusColumn.title}" added to "${list.name}"`
+      );
+      addActivityLog(
+        "Bulk Move to List", 
+        `Moved ${tasksToMove.length} tasks from "${statusColumn.title}" to list "${list.name}"`
+      );
+    }
+  };
+
   const toggleSortOrder = () => {
     setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
   };
@@ -1157,6 +1194,7 @@ export default function TaskManager() {
   onUpdateListColumn={handleUpdateListColumn}
   onDeleteListColumn={handleDeleteListColumn}
   onDropTaskToList={handleDropTaskToList}
+  onDropStatusToList={handleDropStatusToList}
   />
         </div>
 
