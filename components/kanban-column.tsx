@@ -43,6 +43,7 @@ interface KanbanColumnProps {
   isCompact?: boolean;
   searchQuery?: string;
   categories?: Category[];
+  onMarkComplete?: (taskId: string) => void;
 }
 
 const priorityOrder: Record<Priority, number> = {
@@ -153,25 +154,25 @@ export function KanbanColumn({
       onDrop={handleDrop}
     >
       {/* Column Header */}
-      <div className="flex items-center justify-between p-4 pb-2">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between p-4 pb-2 overflow-hidden">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           <button
             onClick={() => onToggleCollapse?.(column.id)}
-            className="hover:bg-secondary/50 rounded-lg p-1 transition-colors"
+            className="hover:bg-secondary/50 rounded-lg p-1 transition-colors shrink-0"
           >
             <ChevronDown className="w-4 h-4 text-muted-foreground" />
           </button>
           <div 
-            className="w-3 h-3 rounded-full" 
+            className="w-3 h-3 rounded-full shrink-0" 
             style={{ backgroundColor: column.color }}
           />
-          <h2 className="font-semibold text-foreground">{column.title}</h2>
-          <span className="flex items-center justify-center w-6 h-6 rounded-full bg-secondary text-secondary-foreground text-xs font-medium">
+          <h2 className="font-semibold text-foreground truncate">{column.title}</h2>
+          <span className="flex items-center justify-center w-6 h-6 rounded-full bg-secondary text-secondary-foreground text-xs font-medium shrink-0">
             {tasks.length}
           </span>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0">
           {!isArchivedView && (
             <Button
               variant="ghost"

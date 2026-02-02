@@ -22,6 +22,8 @@ import {
   Timer,
   Repeat,
   Trash2,
+  CheckCircle2,
+  Circle,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -50,6 +52,7 @@ interface TaskCardProps {
   onDuplicate?: (task: Task) => void;
   onTogglePin?: (taskId: string) => void;
   onInlineEdit?: (taskId: string, title: string) => void;
+  onMarkComplete?: (taskId: string) => void;
   isDragging?: boolean;
   isSelected?: boolean;
   onSelect?: (taskId: string, selected: boolean) => void;
@@ -70,6 +73,7 @@ export function TaskCard({
   onDuplicate,
   onTogglePin,
   onInlineEdit,
+  onMarkComplete,
   isDragging,
   isSelected,
   onSelect,
@@ -214,6 +218,26 @@ export function TaskCard({
       {/* Header */}
       <div className={cn("flex items-start justify-between gap-2 mb-3", isSelectionMode ? "pl-8" : "pl-4")}>
         <div className="flex items-center gap-2 flex-1 min-w-0">
+          {/* Completion toggle button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onMarkComplete?.(task.id);
+            }}
+            className={cn(
+              "shrink-0 transition-all duration-200 hover:scale-110",
+              task.isCompleted 
+                ? "text-emerald-500 hover:text-emerald-600" 
+                : "text-muted-foreground/50 hover:text-emerald-500"
+            )}
+            title={task.isCompleted ? "Mark as incomplete" : "Mark as complete"}
+          >
+            {task.isCompleted ? (
+              <CheckCircle2 className="h-5 w-5 fill-emerald-500/20" />
+            ) : (
+              <Circle className="h-5 w-5" />
+            )}
+          </button>
           {priority && (
             <div
               className={cn(
@@ -236,7 +260,10 @@ export function TaskCard({
               className="h-6 text-sm font-medium py-0 px-1"
             />
           ) : (
-            <h3 className="font-medium text-card-foreground text-sm leading-tight truncate">
+            <h3 className={cn(
+              "font-medium text-card-foreground text-sm leading-tight truncate",
+              task.isCompleted && "line-through text-muted-foreground"
+            )}>
               {highlightText(task.title)}
             </h3>
           )}

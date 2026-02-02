@@ -34,6 +34,8 @@ export interface Task {
   recurrenceEndDate?: string; // When recurrence ends
   dependsOn?: string[]; // Task IDs this task depends on
   blockedBy?: string[]; // Task IDs blocking this task
+  isCompleted?: boolean; // Universal completed flag
+  completedAt?: string; // When task was completed
 }
 
 export interface Category {
@@ -49,6 +51,7 @@ export interface Column {
   title: string;
   color: string;
   isCustom?: boolean;
+  isCompletionStatus?: boolean; // Tasks moved to this status are marked as "completed"
 }
 
 // Activity log type for notifications
@@ -93,7 +96,7 @@ export const DEFAULT_COLUMNS: Column[] = [
   { id: "todo", title: "To Do", color: "#6366f1" },
   { id: "in-progress", title: "In Progress", color: "#f59e0b" },
   { id: "review", title: "Review", color: "#ec4899" },
-  { id: "done", title: "Done", color: "#22c55e" },
+  { id: "done", title: "Done", color: "#22c55e", isCompletionStatus: true },
 ];
 
 // For backwards compatibility

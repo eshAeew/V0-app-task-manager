@@ -772,17 +772,50 @@ export default function TaskManager() {
     e.preventDefault();
   };
 
+  const handleMarkComplete = (taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (task) {
+      const newCompleted = !task.isCompleted;
+      setTasks(tasks.map((t) => 
+        t.id === taskId 
+          ? { 
+              ...t, 
+              isCompleted: newCompleted,
+              completedAt: newCompleted ? new Date().toISOString() : undefined,
+            } 
+          : t
+      ));
+      showToast(
+        newCompleted ? "Task completed" : "Task reopened", 
+        task.title
+      );
+      addActivityLog(
+        newCompleted ? "Task Completed" : "Task Reopened", 
+        task.title
+      );
+    }
+  };
+
   const handleDrop = (e: React.DragEvent, status: Status) => {
     e.preventDefault();
     const taskId = e.dataTransfer.getData("taskId");
     const task = tasks.find((t) => t.id === taskId);
     const oldStatus = task?.status;
-    setTasks(tasks.map((t) => (t.id === taskId ? { ...t, status } : t)));
+    
+    // Check if target status is a completion status
+    const targetColumn = columns.find((c) => c.id === status);
+    const isCompletionStatus = targetColumn?.isCompletionStatus || false;
+    
+    setTasks(tasks.map((t) => (t.id === taskId ? { 
+      ...t, 
+      status,
+      isCompleted: isCompletionStatus ? true : t.isCompleted,
+      completedAt: isCompletionStatus && !t.isCompleted ? new Date().toISOString() : t.completedAt,
+    } : t)));
     setDraggedTaskId(null);
     if (task && oldStatus !== status) {
-      const column = columns.find((c) => c.id === status);
-      showToast("Task moved", `${task.title} moved to ${column?.title}`);
-      addActivityLog("Task Moved", `Moved "${task.title}" to ${column?.title || status}`);
+      showToast("Task moved", `${task.title} moved to ${targetColumn?.title}`);
+      addActivityLog("Task Moved", `Moved "${task.title}" to ${targetColumn?.title || status}`);
     }
   };
 
