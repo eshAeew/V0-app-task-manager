@@ -1453,12 +1453,15 @@ export default function TaskManager() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
               >
-                <CalendarView
-                  tasks={tasks}
-                  columns={allColumnsCombined}
-                  onEditTask={handleEditTask}
-                  onNewTask={handleNewTaskWithDate}
-                />
+<CalendarView
+  tasks={tasks}
+  columns={allColumnsCombined}
+  categories={categories}
+  onEditTask={handleEditTask}
+  onNewTask={handleNewTaskWithDate}
+  onToggleSubtask={handleToggleSubtask}
+  onMarkComplete={handleMarkComplete}
+  />
               </motion.div>
             ) : viewMode === "trash" ? (
               <motion.div
