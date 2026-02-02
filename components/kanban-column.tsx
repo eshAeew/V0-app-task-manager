@@ -85,11 +85,6 @@ export function KanbanColumn({
   const [isDropTarget, setIsDropTarget] = useState(false);
   const [sortType, setSortType] = useState<"none" | "priority" | "dueDate">("none");
   const [isExpanded, setIsExpanded] = useState(false);
-  
-  // Number of tasks to show when collapsed
-  const COLLAPSED_TASK_LIMIT = 5;
-  const hasMoreTasks = tasks.length > COLLAPSED_TASK_LIMIT;
-  const hiddenTaskCount = tasks.length - COLLAPSED_TASK_LIMIT;
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -124,10 +119,17 @@ export function KanbanColumn({
     return 0;
   });
 
+  // Number of tasks to show when collapsed
+  const COLLAPSED_TASK_LIMIT = 4;
+  const hasMoreTasks = sortedTasks.length > COLLAPSED_TASK_LIMIT;
+  const hiddenTaskCount = sortedTasks.length - COLLAPSED_TASK_LIMIT;
+
   // Limit visible tasks when not expanded and there are many tasks
   const visibleTasks = hasMoreTasks && !isExpanded 
     ? sortedTasks.slice(0, COLLAPSED_TASK_LIMIT) 
     : sortedTasks;
+
+  console.log("[v0] Column:", column.title, "| Total tasks:", tasks.length, "| hasMoreTasks:", hasMoreTasks, "| isExpanded:", isExpanded, "| Visible:", visibleTasks.length);
 
   if (isCollapsed) {
     return (
