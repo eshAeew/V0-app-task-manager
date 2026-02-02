@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { Task, Status, Priority, ViewMode, CustomList, Category, Column, TaskTemplate, BoardViewType } from "@/lib/types";
 import { DEFAULT_COLUMNS, DEFAULT_CATEGORIES } from "@/lib/types";
 import { INITIAL_TASKS, INITIAL_LISTS, generateId } from "@/lib/task-store";
+import { cn } from "@/lib/utils";
 import { Header, type Notification } from "@/components/header";
 import { AppSidebar } from "@/components/app-sidebar";
 import { KanbanColumn } from "@/components/kanban-column";
@@ -259,6 +260,10 @@ export default function TaskManager() {
   const [isCompactView, setIsCompactView] = useState(false);
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
+
+  // Column drag state for main board
+  const [draggingColumnId, setDraggingColumnId] = useState<string | null>(null);
+  const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
 
   // Toast helper
   const showToast = useCallback((title: string, description?: string) => {
@@ -1071,6 +1076,22 @@ export default function TaskManager() {
     addActivityLog("Status Deleted", `Deleted status: ${column.title}`);
   };
 
+  // Column/status reordering
+  const handleReorderColumns = (newOrder: Column[]) => {
+    if (selectedListId) {
+      // Reorder columns within the selected list
+      setCustomLists(customLists.map((list) => {
+        if (list.id === selectedListId) {
+          return { ...list, columns: newOrder };
+        }
+        return list;
+      }));
+    } else {
+      // Reorder global columns
+      setColumns(newOrder);
+    }
+  };
+
   // List-specific column/status management
   const handleAddListColumn = (listId: string, column: Column) => {
     setCustomLists(customLists.map((list) => {
@@ -1279,9 +1300,10 @@ export default function TaskManager() {
   onAddListColumn={handleAddListColumn}
   onUpdateListColumn={handleUpdateListColumn}
   onDeleteListColumn={handleDeleteListColumn}
-  onDropTaskToList={handleDropTaskToList}
-  onDropStatusToList={handleDropStatusToList}
-  />
+            onDropTaskToList={handleDropTaskToList}
+            onDropStatusToList={handleDropStatusToList}
+            onReorderColumns={handleReorderColumns}
+            />
         </div>
 
         <main className="flex-1 p-6 overflow-x-auto print:p-0">
@@ -1603,38 +1625,97 @@ export default function TaskManager() {
 
                 {/* Kanban Board */}
                 <div className="flex gap-6 pb-20 print:block print:space-y-4 print:pb-0">
-                  {activeColumns.map((column) => (
-                    <KanbanColumn
+                  {activeColumns.map((column, index) => (
+                    <div
                       key={column.id}
-                      column={column}
-                      tasks={viewMode === "archived" 
-                        ? filteredTasks.filter(t => t.status === column.id)
-                        : filteredTasks.filter(t => t.status === column.id && !t.isArchived)
-                      }
-                      onEditTask={handleEditTask}
-                      onDeleteTask={handleDeleteTask}
-                      onAddTask={handleAddTaskToColumn}
-                      onDragOver={handleDragOver}
-                      onDrop={handleDrop}
-                      onDragStart={handleDragStart}
-                      onToggleFavorite={handleToggleFavorite}
-                      onArchive={handleArchive}
-                      onToggleSubtask={handleToggleSubtask}
-                      onDuplicate={handleDuplicateTask}
-                      onTogglePin={handleTogglePin}
-                      onInlineEdit={handleInlineEdit}
-                      draggedTaskId={draggedTaskId}
-                      isArchivedView={viewMode === "archived"}
-                      isCollapsed={collapsedColumns.includes(column.id)}
-                      onToggleCollapse={handleToggleColumnCollapse}
-                      isSelectionMode={isSelectionMode}
-                      selectedTaskIds={selectedTaskIds}
-                      onSelectTask={handleSelectTask}
-  isCompact={isCompactView}
-  searchQuery={searchQuery}
-  categories={categories}
-  onMarkComplete={handleMarkComplete}
-  />
+                      className={cn(
+                        "relative transition-all duration-200",
+                        draggingColumnId === column.id && "opacity-50 scale-[0.98]",
+                        dragOverColumnId === column.id && "scale-[1.02]"
+                      )}
+                      draggable
+                      onDragStart={(e) => {
+                        // Only allow column drag if not dragging from task cards
+                        if ((e.target as HTMLElement).closest('.task-card')) {
+                          return;
+                        }
+                        e.dataTransfer.setData("columnId", column.id);
+                        e.dataTransfer.setData("statusId", column.id); // Also set statusId for sidebar list drops
+                        e.dataTransfer.setData("columnReorder", "true");
+                        e.dataTransfer.effectAllowed = "move";
+                        setDraggingColumnId(column.id);
+                      }}
+                      onDragEnd={() => {
+                        setDraggingColumnId(null);
+                        setDragOverColumnId(null);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        const columnId = e.dataTransfer.types.includes("columnreorder") || 
+                                        e.dataTransfer.getData("columnReorder");
+                        if (draggingColumnId && draggingColumnId !== column.id) {
+                          setDragOverColumnId(column.id);
+                        }
+                      }}
+                      onDragLeave={(e) => {
+                        // Only reset if leaving the column entirely
+                        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                          setDragOverColumnId(null);
+                        }
+                      }}
+                      onDrop={(e) => {
+                        const isColumnReorder = e.dataTransfer.getData("columnReorder");
+                        if (isColumnReorder && draggingColumnId && draggingColumnId !== column.id) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const dragIndex = activeColumns.findIndex((c) => c.id === draggingColumnId);
+                          const dropIndex = index;
+                          if (dragIndex !== -1 && dropIndex !== -1) {
+                            const newColumns = [...activeColumns];
+                            const [removed] = newColumns.splice(dragIndex, 1);
+                            newColumns.splice(dropIndex, 0, removed);
+                            handleReorderColumns(newColumns);
+                          }
+                          setDraggingColumnId(null);
+                          setDragOverColumnId(null);
+                        }
+                      }}
+                    >
+                      {/* Drop indicator line */}
+                      {dragOverColumnId === column.id && draggingColumnId && (
+                        <div className="absolute -left-3 top-0 bottom-0 w-1 bg-primary rounded-full" />
+                      )}
+                      <KanbanColumn
+                        column={column}
+                        tasks={viewMode === "archived" 
+                          ? filteredTasks.filter(t => t.status === column.id)
+                          : filteredTasks.filter(t => t.status === column.id && !t.isArchived)
+                        }
+                        onEditTask={handleEditTask}
+                        onDeleteTask={handleDeleteTask}
+                        onAddTask={handleAddTaskToColumn}
+                        onDragOver={handleDragOver}
+                        onDrop={handleDrop}
+                        onDragStart={handleDragStart}
+                        onToggleFavorite={handleToggleFavorite}
+                        onArchive={handleArchive}
+                        onToggleSubtask={handleToggleSubtask}
+                        onDuplicate={handleDuplicateTask}
+                        onTogglePin={handleTogglePin}
+                        onInlineEdit={handleInlineEdit}
+                        draggedTaskId={draggedTaskId}
+                        isArchivedView={viewMode === "archived"}
+                        isCollapsed={collapsedColumns.includes(column.id)}
+                        onToggleCollapse={handleToggleColumnCollapse}
+                        isSelectionMode={isSelectionMode}
+                        selectedTaskIds={selectedTaskIds}
+                        onSelectTask={handleSelectTask}
+                        isCompact={isCompactView}
+                        searchQuery={searchQuery}
+                        categories={categories}
+                        onMarkComplete={handleMarkComplete}
+                      />
+                    </div>
                   ))}
                 </div>
               </motion.div>

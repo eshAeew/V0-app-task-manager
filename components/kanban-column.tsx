@@ -8,7 +8,7 @@ import { DEFAULT_CATEGORIES } from "@/lib/types";
 import { TaskCard } from "./task-card";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Plus, MoreHorizontal, ChevronDown, ChevronRight, ArrowUpDown, Layers, CheckCircle2 } from "lucide-react";
+import { Plus, MoreHorizontal, ChevronDown, ChevronRight, ArrowUpDown, Layers, CheckCircle2, GripVertical } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -159,8 +159,9 @@ export function KanbanColumn({
       onDrop={handleDrop}
     >
       {/* Column Header */}
-      <div className="flex items-center justify-between p-4 pb-2 overflow-hidden">
+      <div className="flex items-center justify-between p-4 pb-2 overflow-hidden cursor-grab active:cursor-grabbing group/header">
         <div className="flex items-center gap-2 min-w-0 flex-1">
+          <GripVertical className="w-4 h-4 text-muted-foreground/30 group-hover/header:text-muted-foreground/70 transition-colors shrink-0" />
           <button
             onClick={() => onToggleCollapse?.(column.id)}
             className="hover:bg-secondary/50 rounded-lg p-1 transition-colors shrink-0"
@@ -249,6 +250,7 @@ export function KanbanColumn({
               draggable={!isSelectionMode}
               onDragStart={(e) => !isSelectionMode && onDragStart(e, task)}
               className={cn(
+                "task-card",
                 !isSelectionMode && "cursor-grab active:cursor-grabbing"
               )}
             >
