@@ -86,6 +86,8 @@ interface AppSidebarProps {
   // Drag and drop to lists
   onDropTaskToList?: (taskId: string, listId: string) => void;
   onDropStatusToList?: (statusId: string, listId: string) => void;
+  // Status/column reordering
+  onReorderColumns?: (newOrder: Column[]) => void;
 }
 
 const iconMap: Record<string, React.ElementType> = {
@@ -135,6 +137,7 @@ export function AppSidebar({
   onDeleteListColumn,
   onDropTaskToList,
   onDropStatusToList,
+  onReorderColumns,
 }: AppSidebarProps) {
   const [showNewListDialog, setShowNewListDialog] = useState(false);
   const [editingList, setEditingList] = useState<CustomList | null>(null);
@@ -160,6 +163,10 @@ export function AppSidebar({
   const [newColumnName, setNewColumnName] = useState("");
   const [newColumnColor, setNewColumnColor] = useState(LIST_COLORS[0]);
   const [newColumnIsCompletion, setNewColumnIsCompletion] = useState(false);
+
+  // Status drag reordering state
+  const [draggingStatusId, setDraggingStatusId] = useState<string | null>(null);
+  const [dragOverStatusId, setDragOverStatusId] = useState<string | null>(null);
 
   const totalTasks = Object.values(taskCounts).reduce((a, b) => a + b, 0) / 2; // Divided by 2 because we count both category and status
   const completedTasks = taskCounts.done || 0;
@@ -418,10 +425,11 @@ export function AppSidebar({
                     e.stopPropagation();
                     const taskId = e.dataTransfer.getData("taskId");
                     const statusId = e.dataTransfer.getData("statusId");
+                    const columnId = e.dataTransfer.getData("columnId");
                     if (taskId && onDropTaskToList) {
                       onDropTaskToList(taskId, list.id);
-                    } else if (statusId && onDropStatusToList) {
-                      onDropStatusToList(statusId, list.id);
+                    } else if ((statusId || columnId) && onDropStatusToList) {
+                      onDropStatusToList(statusId || columnId, list.id);
                     }
                     setDragOverListId(null);
                   }}
@@ -596,20 +604,56 @@ export function AppSidebar({
           </div>
           <CollapsibleContent>
             <div className="space-y-1">
-              {activeColumns.map((column) => (
+              {activeColumns.map((column, index) => (
                 <div 
                   key={column.id} 
-                  className="group relative"
+                  className={cn(
+                    "group relative transition-all duration-200",
+                    draggingStatusId === column.id && "opacity-50",
+                    dragOverStatusId === column.id && "border-t-2 border-primary"
+                  )}
                   draggable
                   onDragStart={(e) => {
                     e.dataTransfer.setData("statusId", column.id);
+                    e.dataTransfer.setData("statusReorder", "true");
                     e.dataTransfer.effectAllowed = "move";
+                    setDraggingStatusId(column.id);
+                  }}
+                  onDragEnd={() => {
+                    setDraggingStatusId(null);
+                    setDragOverStatusId(null);
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    if (draggingStatusId && draggingStatusId !== column.id) {
+                      setDragOverStatusId(column.id);
+                    }
+                  }}
+                  onDragLeave={() => {
+                    setDragOverStatusId(null);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const isReorder = e.dataTransfer.getData("statusReorder");
+                    if (isReorder && draggingStatusId && draggingStatusId !== column.id && onReorderColumns) {
+                      const dragIndex = activeColumns.findIndex((c) => c.id === draggingStatusId);
+                      const dropIndex = index;
+                      if (dragIndex !== -1 && dropIndex !== -1) {
+                        const newColumns = [...activeColumns];
+                        const [removed] = newColumns.splice(dragIndex, 1);
+                        newColumns.splice(dropIndex, 0, removed);
+                        onReorderColumns(newColumns);
+                      }
+                    }
+                    setDraggingStatusId(null);
+                    setDragOverStatusId(null);
                   }}
                 >
                   <Button
                     variant="ghost"
                     className={cn(
-                      "w-full justify-start gap-3 rounded-xl h-10 px-3 pr-9",
+                      "w-full justify-start gap-2 rounded-xl h-10 px-3",
                       "hover:bg-sidebar-accent text-sidebar-foreground",
                       selectedStatus === column.id && "bg-sidebar-accent"
                     )}
@@ -632,12 +676,16 @@ export function AppSidebar({
                         style={{ backgroundColor: column.color }}
                       />
                     )}
-                    <span className="text-sm flex-1 text-left truncate">{column.title}</span>
-                    {column.isCompletionStatus && (
-                      <span className="text-[10px] text-emerald-500 font-medium shrink-0">Done</span>
-                    )}
-                    <span className="text-xs text-sidebar-foreground/50 shrink-0">
-                      {taskCounts[column.id] || 0}
+                    <span className="text-sm flex-1 text-left truncate max-w-[80px]">{column.title}</span>
+                    
+                    {/* Right side container for Done label and count */}
+                    <span className="flex items-center gap-1.5 ml-auto shrink-0">
+                      {column.isCompletionStatus && (
+                        <span className="text-[10px] text-emerald-500 font-medium">Done</span>
+                      )}
+                      <span className="text-xs text-sidebar-foreground/50 min-w-[12px] text-right group-hover:opacity-0 transition-opacity">
+                        {taskCounts[column.id] || 0}
+                      </span>
                     </span>
                   </Button>
 
@@ -646,7 +694,7 @@ export function AppSidebar({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-sidebar-accent/50"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-sidebar-accent/50"
                       >
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>

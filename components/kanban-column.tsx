@@ -8,7 +8,7 @@ import { DEFAULT_CATEGORIES } from "@/lib/types";
 import { TaskCard } from "./task-card";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Plus, MoreHorizontal, ChevronDown, ChevronRight, ArrowUpDown, Layers, CheckCircle2 } from "lucide-react";
+import { Plus, MoreHorizontal, ChevronDown, ChevronRight, ChevronUp, ArrowUpDown, Layers, CheckCircle2, GripVertical } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,6 +44,7 @@ interface KanbanColumnProps {
   searchQuery?: string;
   categories?: Category[];
   onMarkComplete?: (taskId: string) => void;
+  columns?: Column[];
 }
 
 const priorityOrder: Record<Priority, number> = {
@@ -79,9 +80,11 @@ export function KanbanColumn({
   searchQuery = "",
   categories = DEFAULT_CATEGORIES,
   onMarkComplete,
+  columns = [],
 }: KanbanColumnProps) {
   const [isDropTarget, setIsDropTarget] = useState(false);
   const [sortType, setSortType] = useState<"none" | "priority" | "dueDate">("none");
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -115,6 +118,16 @@ export function KanbanColumn({
     }
     return 0;
   });
+
+  // Number of tasks to show when collapsed
+  const COLLAPSED_TASK_LIMIT = 4;
+  const hasMoreTasks = sortedTasks.length > COLLAPSED_TASK_LIMIT;
+  const hiddenTaskCount = sortedTasks.length - COLLAPSED_TASK_LIMIT;
+
+  // Limit visible tasks when not expanded and there are many tasks
+  const visibleTasks = hasMoreTasks && !isExpanded 
+    ? sortedTasks.slice(0, COLLAPSED_TASK_LIMIT) 
+    : sortedTasks;
 
   if (isCollapsed) {
     return (
@@ -159,8 +172,9 @@ export function KanbanColumn({
       onDrop={handleDrop}
     >
       {/* Column Header */}
-      <div className="flex items-center justify-between p-4 pb-2 overflow-hidden">
+      <div className="flex items-center justify-between p-4 pb-2 overflow-hidden cursor-grab active:cursor-grabbing group/header">
         <div className="flex items-center gap-2 min-w-0 flex-1">
+          <GripVertical className="w-4 h-4 text-muted-foreground/30 group-hover/header:text-muted-foreground/70 transition-colors shrink-0" />
           <button
             onClick={() => onToggleCollapse?.(column.id)}
             className="hover:bg-secondary/50 rounded-lg p-1 transition-colors shrink-0"
@@ -241,14 +255,18 @@ export function KanbanColumn({
       )}
 
       {/* Tasks Container */}
-      <div className="flex-1 p-3 pt-1 space-y-3 overflow-y-auto scrollbar-thin">
+      <div className={cn(
+        "flex-1 p-3 pt-1 space-y-3 overflow-y-auto scrollbar-thin",
+        isExpanded && hasMoreTasks && "max-h-[600px]"
+      )}>
         <AnimatePresence mode="popLayout">
-          {sortedTasks.map((task) => (
+          {visibleTasks.map((task) => (
             <div
               key={task.id}
               draggable={!isSelectionMode}
               onDragStart={(e) => !isSelectionMode && onDragStart(e, task)}
               className={cn(
+                "task-card",
                 !isSelectionMode && "cursor-grab active:cursor-grabbing"
               )}
             >
@@ -267,13 +285,46 @@ export function KanbanColumn({
                 isSelected={selectedTaskIds.includes(task.id)}
                 onSelect={onSelectTask}
                 isSelectionMode={isSelectionMode}
-                isCompact={isCompact}
-                searchQuery={searchQuery}
-                categories={categories}
-              />
+  isCompact={isCompact}
+  searchQuery={searchQuery}
+  categories={categories}
+  columns={columns}
+  />
             </div>
           ))}
         </AnimatePresence>
+
+        {/* Show More/Less Button */}
+        {hasMoreTasks && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="pt-1"
+          >
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "w-full justify-center text-xs text-muted-foreground",
+                "hover:text-foreground hover:bg-secondary/50 rounded-xl",
+                "border border-dashed border-border/50"
+              )}
+              onClick={() => setIsExpanded(!isExpanded)}
+            >
+              {isExpanded ? (
+                <>
+                  <ChevronUp className="h-3 w-3 mr-1" />
+                  Show less
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-3 w-3 mr-1" />
+                  Show {hiddenTaskCount} more task{hiddenTaskCount !== 1 ? 's' : ''}
+                </>
+              )}
+            </Button>
+          </motion.div>
+        )}
 
         {/* Empty State */}
         {tasks.length === 0 && (

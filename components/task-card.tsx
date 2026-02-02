@@ -24,7 +24,15 @@ import {
   Trash2,
   CheckCircle2,
   Circle,
+  Eye,
+  Pencil,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,6 +49,7 @@ import {
 } from "@/components/ui/context-menu";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { ViewTaskDialog } from "@/components/view-task-dialog";
 
 interface TaskCardProps {
   task: Task;
@@ -81,11 +90,13 @@ export function TaskCard({
   isCompact = false,
   searchQuery = "",
   categories = DEFAULT_CATEGORIES,
+  columns = [],
 }: TaskCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isInlineEditing, setIsInlineEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
   const [expandedSubtasks, setExpandedSubtasks] = useState(false);
+  const [showViewDialog, setShowViewDialog] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const priority = PRIORITIES.find((p) => p.value === task.priority);
@@ -284,6 +295,7 @@ export function TaskCard({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48 rounded-xl">
             <DropdownMenuItem onClick={() => onEdit(task)}>
+              <Pencil className="h-4 w-4 mr-2" />
               Edit task
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onDuplicate?.(task)}>
@@ -316,10 +328,26 @@ export function TaskCard({
 
       {/* Description with markdown - hide in compact mode */}
       {!isCompact && task.description && (
-        <div 
-          className={cn("text-xs text-muted-foreground line-clamp-2 mb-3 prose prose-sm prose-slate dark:prose-invert max-w-none", isSelectionMode ? "pl-8" : "pl-4")}
-          dangerouslySetInnerHTML={{ __html: parseMarkdown(task.description) }}
-        />
+        <TooltipProvider delayDuration={3000}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div 
+                className={cn("text-xs text-muted-foreground line-clamp-2 mb-3 prose prose-sm prose-slate dark:prose-invert max-w-none cursor-default", isSelectionMode ? "pl-8" : "pl-4")}
+                dangerouslySetInnerHTML={{ __html: parseMarkdown(task.description) }}
+              />
+            </TooltipTrigger>
+            <TooltipContent 
+              side="bottom" 
+              align="start"
+              className="max-w-sm p-3 text-sm bg-card text-card-foreground border shadow-lg rounded-xl z-50"
+            >
+              <div 
+                className="text-sm text-foreground whitespace-pre-wrap"
+                dangerouslySetInnerHTML={{ __html: parseMarkdown(task.description) }}
+              />
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       )}
 
       {/* Subtasks Progress */}
@@ -438,6 +466,18 @@ export function TaskCard({
               title={category.name}
             />
           )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowViewDialog(true);
+            }}
+            title="View details"
+          >
+            <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+          </Button>
         </div>
       </div>
 
@@ -458,7 +498,12 @@ export function TaskCard({
       <ContextMenuTrigger>{cardContent}</ContextMenuTrigger>
       <ContextMenuContent className="w-48 rounded-xl">
         <ContextMenuItem onClick={() => onEdit(task)}>
+          <Pencil className="h-4 w-4 mr-2" />
           Edit task
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => setShowViewDialog(true)}>
+          <Eye className="h-4 w-4 mr-2" />
+          View Details
         </ContextMenuItem>
         <ContextMenuItem onClick={() => onDuplicate?.(task)}>
           <Copy className="h-4 w-4 mr-2" />
@@ -485,6 +530,17 @@ export function TaskCard({
           Delete
         </ContextMenuItem>
       </ContextMenuContent>
+
+      {/* View Task Dialog */}
+      <ViewTaskDialog
+        task={task}
+        open={showViewDialog}
+        onOpenChange={setShowViewDialog}
+        onToggleSubtask={onToggleSubtask}
+        onMarkComplete={onMarkComplete}
+        categories={categories}
+        columns={columns}
+      />
     </ContextMenu>
   );
 }

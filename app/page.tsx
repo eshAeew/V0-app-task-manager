@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { Task, Status, Priority, ViewMode, CustomList, Category, Column, TaskTemplate, BoardViewType } from "@/lib/types";
 import { DEFAULT_COLUMNS, DEFAULT_CATEGORIES } from "@/lib/types";
 import { INITIAL_TASKS, INITIAL_LISTS, generateId } from "@/lib/task-store";
+import { cn } from "@/lib/utils";
 import { Header, type Notification } from "@/components/header";
 import { AppSidebar } from "@/components/app-sidebar";
 import { KanbanColumn } from "@/components/kanban-column";
@@ -259,6 +260,10 @@ export default function TaskManager() {
   const [isCompactView, setIsCompactView] = useState(false);
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
+
+  // Column drag state for main board
+  const [draggingColumnId, setDraggingColumnId] = useState<string | null>(null);
+  const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
 
   // Toast helper
   const showToast = useCallback((title: string, description?: string) => {
@@ -844,37 +849,66 @@ export default function TaskManager() {
 
   const handleDropStatusToList = (statusId: string, listId: string) => {
     const list = customLists.find((l) => l.id === listId);
-    const statusColumn = columns.find((c) => c.id === statusId);
+    // Check both global columns and list-specific columns
+    const globalColumn = columns.find((c) => c.id === statusId);
+    const sourceList = customLists.find((l) => l.columns?.some((c) => c.id === statusId));
+    const sourceListColumn = sourceList?.columns?.find((c) => c.id === statusId);
+    const statusColumn = globalColumn || sourceListColumn;
+    
     if (list && statusColumn) {
-      // Find all tasks with this status that aren't already in the list
+      // Find all tasks with this status (from any list or no list for global statuses)
       const tasksToMove = tasks.filter(
-        (t) => t.status === statusId && t.listId !== listId && !t.isDeleted && !t.isArchived
+        (t) => t.status === statusId && !t.isDeleted && !t.isArchived
       );
       
-      if (tasksToMove.length === 0) {
-        showToast("No tasks to move", `No tasks with status "${statusColumn.title}" to move`);
-        return;
-      }
-
-      // Get target status for the list
-      const listColumns = list.columns && list.columns.length > 0 ? list.columns : columns;
-      const targetStatus = listColumns.some((c) => c.id === statusId) 
-        ? statusId 
-        : listColumns[0]?.id || statusId;
+      // Clone the status column to the target list if it doesn't exist there
+      const listColumns = list.columns || [];
+      const statusExistsInTargetList = listColumns.some((c) => c.id === statusId);
       
+      if (!statusExistsInTargetList) {
+        // Add the status column to the target list
+        const newColumn: Column = {
+          ...statusColumn,
+          id: statusColumn.id, // Keep the same ID so tasks stay linked
+        };
+        
+        setCustomLists(customLists.map((l) => {
+          if (l.id === listId) {
+            const existingColumns = l.columns || [];
+            return { ...l, columns: [...existingColumns, newColumn] };
+          }
+          // If this was a list-specific column, remove it from the source list
+          if (sourceList && l.id === sourceList.id && sourceListColumn) {
+            const remainingColumns = (l.columns || []).filter((c) => c.id !== statusId);
+            // Only remove if there are other columns remaining
+            if (remainingColumns.length > 0) {
+              return { ...l, columns: remainingColumns };
+            }
+          }
+          return l;
+        }));
+        
+        // If it was a global column, remove it from global columns
+        if (globalColumn) {
+          setColumns(columns.filter((c) => c.id !== statusId));
+        }
+      }
+      
+      // Move all tasks with this status to the target list
       setTasks(tasks.map((t) => 
-        tasksToMove.some((m) => m.id === t.id) 
-          ? { ...t, listId, status: targetStatus } 
+        t.status === statusId && !t.isDeleted && !t.isArchived
+          ? { ...t, listId } 
           : t
       ));
       
+      const taskCount = tasksToMove.length;
       showToast(
-        "Tasks moved to list", 
-        `${tasksToMove.length} task${tasksToMove.length > 1 ? 's' : ''} from "${statusColumn.title}" added to "${list.name}"`
+        "Status moved to list", 
+        `"${statusColumn.title}" with ${taskCount} task${taskCount !== 1 ? 's' : ''} moved to "${list.name}"`
       );
       addActivityLog(
-        "Bulk Move to List", 
-        `Moved ${tasksToMove.length} tasks from "${statusColumn.title}" to list "${list.name}"`
+        "Status Moved to List", 
+        `Moved status "${statusColumn.title}" with ${taskCount} tasks to list "${list.name}"`
       );
     }
   };
@@ -1042,6 +1076,22 @@ export default function TaskManager() {
     addActivityLog("Status Deleted", `Deleted status: ${column.title}`);
   };
 
+  // Column/status reordering
+  const handleReorderColumns = (newOrder: Column[]) => {
+    if (selectedListId) {
+      // Reorder columns within the selected list
+      setCustomLists(customLists.map((list) => {
+        if (list.id === selectedListId) {
+          return { ...list, columns: newOrder };
+        }
+        return list;
+      }));
+    } else {
+      // Reorder global columns
+      setColumns(newOrder);
+    }
+  };
+
   // List-specific column/status management
   const handleAddListColumn = (listId: string, column: Column) => {
     setCustomLists(customLists.map((list) => {
@@ -1165,13 +1215,33 @@ export default function TaskManager() {
   const hasActiveFilters = selectedCategory || selectedListId || selectedStatus || filterPriority !== "all" || searchQuery;
 
   // Get active columns: use list-specific columns if a list is selected and has columns, otherwise use global columns
+  // When viewing "All Tasks" (no list selected), show all columns from global + all lists combined
   const selectedList = customLists.find((l) => l.id === selectedListId);
   const activeColumns = useMemo(() => {
     if (selectedListId && selectedList?.columns && selectedList.columns.length > 0) {
       return selectedList.columns;
     }
+    // When no list is selected (All Tasks view), combine global columns with all list-specific columns
+    if (!selectedListId) {
+      const allColumns = [...columns];
+      const columnIds = new Set(columns.map(c => c.id));
+      
+      // Add list-specific columns that don't exist in global columns
+      customLists.forEach((list) => {
+        if (list.columns) {
+          list.columns.forEach((col) => {
+            if (!columnIds.has(col.id)) {
+              allColumns.push(col);
+              columnIds.add(col.id);
+            }
+          });
+        }
+      });
+      
+      return allColumns;
+    }
     return columns;
-  }, [selectedListId, selectedList?.columns, columns]);
+  }, [selectedListId, selectedList?.columns, columns, customLists]);
 
   // Show loading state
   if (!isHydrated) {
@@ -1230,9 +1300,10 @@ export default function TaskManager() {
   onAddListColumn={handleAddListColumn}
   onUpdateListColumn={handleUpdateListColumn}
   onDeleteListColumn={handleDeleteListColumn}
-  onDropTaskToList={handleDropTaskToList}
-  onDropStatusToList={handleDropStatusToList}
-  />
+            onDropTaskToList={handleDropTaskToList}
+            onDropStatusToList={handleDropStatusToList}
+            onReorderColumns={handleReorderColumns}
+            />
         </div>
 
         <main className="flex-1 p-6 overflow-x-auto print:p-0">
@@ -1554,38 +1625,98 @@ export default function TaskManager() {
 
                 {/* Kanban Board */}
                 <div className="flex gap-6 pb-20 print:block print:space-y-4 print:pb-0">
-                  {activeColumns.map((column) => (
-                    <KanbanColumn
+                  {activeColumns.map((column, index) => (
+                    <div
                       key={column.id}
-                      column={column}
-                      tasks={viewMode === "archived" 
-                        ? filteredTasks.filter(t => t.status === column.id)
-                        : filteredTasks.filter(t => t.status === column.id && !t.isArchived)
-                      }
-                      onEditTask={handleEditTask}
-                      onDeleteTask={handleDeleteTask}
-                      onAddTask={handleAddTaskToColumn}
-                      onDragOver={handleDragOver}
-                      onDrop={handleDrop}
-                      onDragStart={handleDragStart}
-                      onToggleFavorite={handleToggleFavorite}
-                      onArchive={handleArchive}
-                      onToggleSubtask={handleToggleSubtask}
-                      onDuplicate={handleDuplicateTask}
-                      onTogglePin={handleTogglePin}
-                      onInlineEdit={handleInlineEdit}
-                      draggedTaskId={draggedTaskId}
-                      isArchivedView={viewMode === "archived"}
-                      isCollapsed={collapsedColumns.includes(column.id)}
-                      onToggleCollapse={handleToggleColumnCollapse}
-                      isSelectionMode={isSelectionMode}
-                      selectedTaskIds={selectedTaskIds}
-                      onSelectTask={handleSelectTask}
-  isCompact={isCompactView}
-  searchQuery={searchQuery}
-  categories={categories}
-  onMarkComplete={handleMarkComplete}
-  />
+                      className={cn(
+                        "relative transition-all duration-200",
+                        draggingColumnId === column.id && "opacity-50 scale-[0.98]",
+                        dragOverColumnId === column.id && "scale-[1.02]"
+                      )}
+                      draggable
+                      onDragStart={(e) => {
+                        // Only allow column drag if not dragging from task cards
+                        if ((e.target as HTMLElement).closest('.task-card')) {
+                          return;
+                        }
+                        e.dataTransfer.setData("columnId", column.id);
+                        e.dataTransfer.setData("statusId", column.id); // Also set statusId for sidebar list drops
+                        e.dataTransfer.setData("columnReorder", "true");
+                        e.dataTransfer.effectAllowed = "move";
+                        setDraggingColumnId(column.id);
+                      }}
+                      onDragEnd={() => {
+                        setDraggingColumnId(null);
+                        setDragOverColumnId(null);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        const columnId = e.dataTransfer.types.includes("columnreorder") || 
+                                        e.dataTransfer.getData("columnReorder");
+                        if (draggingColumnId && draggingColumnId !== column.id) {
+                          setDragOverColumnId(column.id);
+                        }
+                      }}
+                      onDragLeave={(e) => {
+                        // Only reset if leaving the column entirely
+                        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                          setDragOverColumnId(null);
+                        }
+                      }}
+                      onDrop={(e) => {
+                        const isColumnReorder = e.dataTransfer.getData("columnReorder");
+                        if (isColumnReorder && draggingColumnId && draggingColumnId !== column.id) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const dragIndex = activeColumns.findIndex((c) => c.id === draggingColumnId);
+                          const dropIndex = index;
+                          if (dragIndex !== -1 && dropIndex !== -1) {
+                            const newColumns = [...activeColumns];
+                            const [removed] = newColumns.splice(dragIndex, 1);
+                            newColumns.splice(dropIndex, 0, removed);
+                            handleReorderColumns(newColumns);
+                          }
+                          setDraggingColumnId(null);
+                          setDragOverColumnId(null);
+                        }
+                      }}
+                    >
+                      {/* Drop indicator line */}
+                      {dragOverColumnId === column.id && draggingColumnId && (
+                        <div className="absolute -left-3 top-0 bottom-0 w-1 bg-primary rounded-full" />
+                      )}
+                      <KanbanColumn
+                        column={column}
+                        tasks={viewMode === "archived" 
+                          ? filteredTasks.filter(t => t.status === column.id)
+                          : filteredTasks.filter(t => t.status === column.id && !t.isArchived)
+                        }
+                        onEditTask={handleEditTask}
+                        onDeleteTask={handleDeleteTask}
+                        onAddTask={handleAddTaskToColumn}
+                        onDragOver={handleDragOver}
+                        onDrop={handleDrop}
+                        onDragStart={handleDragStart}
+                        onToggleFavorite={handleToggleFavorite}
+                        onArchive={handleArchive}
+                        onToggleSubtask={handleToggleSubtask}
+                        onDuplicate={handleDuplicateTask}
+                        onTogglePin={handleTogglePin}
+                        onInlineEdit={handleInlineEdit}
+                        draggedTaskId={draggedTaskId}
+                        isArchivedView={viewMode === "archived"}
+                        isCollapsed={collapsedColumns.includes(column.id)}
+                        onToggleCollapse={handleToggleColumnCollapse}
+                        isSelectionMode={isSelectionMode}
+                        selectedTaskIds={selectedTaskIds}
+                        onSelectTask={handleSelectTask}
+                        isCompact={isCompactView}
+                        searchQuery={searchQuery}
+                        categories={categories}
+                        onMarkComplete={handleMarkComplete}
+                        columns={activeColumns}
+                      />
+                    </div>
                   ))}
                 </div>
               </motion.div>
