@@ -653,7 +653,7 @@ export function AppSidebar({
                   <Button
                     variant="ghost"
                     className={cn(
-                      "w-full justify-start gap-2 rounded-xl h-10 px-3 pr-8",
+                      "w-full justify-start gap-2 rounded-xl h-10 px-3",
                       "hover:bg-sidebar-accent text-sidebar-foreground",
                       selectedStatus === column.id && "bg-sidebar-accent"
                     )}
@@ -676,16 +676,18 @@ export function AppSidebar({
                         style={{ backgroundColor: column.color }}
                       />
                     )}
-                    <span className="text-sm flex-1 text-left truncate">{column.title}</span>
-                    {column.isCompletionStatus && (
-                      <span className="text-[10px] text-emerald-500 font-medium shrink-0">Done</span>
-                    )}
+                    <span className="text-sm flex-1 text-left truncate max-w-[80px]">{column.title}</span>
+                    
+                    {/* Right side container for Done label and count */}
+                    <span className="flex items-center gap-1.5 ml-auto shrink-0">
+                      {column.isCompletionStatus && (
+                        <span className="text-[10px] text-emerald-500 font-medium">Done</span>
+                      )}
+                      <span className="text-xs text-sidebar-foreground/50 min-w-[12px] text-right group-hover:opacity-0 transition-opacity">
+                        {taskCounts[column.id] || 0}
+                      </span>
+                    </span>
                   </Button>
-
-                  {/* Task count - shows when not hovered */}
-                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-sidebar-foreground/50 group-hover:opacity-0 transition-opacity pointer-events-none">
-                    {taskCounts[column.id] || 0}
-                  </span>
 
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
