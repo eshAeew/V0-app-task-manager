@@ -13,17 +13,23 @@ import {
   Plus,
   Calendar as CalendarIcon,
 } from "lucide-react";
+import { ViewTaskDialog } from "@/components/view-task-dialog";
+import type { Category } from "@/lib/types";
 
 interface CalendarViewProps {
   tasks: Task[];
   columns: Column[];
+  categories: Category[];
   onEditTask: (task: Task) => void;
   onNewTask: (date: string) => void;
+  onToggleSubtask: (taskId: string, subtaskId: string) => void;
+  onMarkComplete: (taskId: string) => void;
 }
 
-export function CalendarView({ tasks, columns, onEditTask, onNewTask }: CalendarViewProps) {
+export function CalendarView({ tasks, columns, categories, onEditTask, onNewTask, onToggleSubtask, onMarkComplete }: CalendarViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [viewingTask, setViewingTask] = useState<Task | null>(null);
 
   const monthNames = [
     "January", "February", "March", "April", "May", "June",
@@ -199,7 +205,7 @@ export function CalendarView({ tasks, columns, onEditTask, onNewTask }: Calendar
                         key={task.id}
                         onClick={(e) => {
                           e.stopPropagation();
-                          onEditTask(task);
+                          setViewingTask(task);
                         }}
                         className={cn(
                           "text-[10px] px-1.5 py-0.5 rounded-md truncate",
@@ -281,7 +287,7 @@ export function CalendarView({ tasks, columns, onEditTask, onNewTask }: Calendar
                       key={task.id}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      onClick={() => onEditTask(task)}
+                      onClick={() => setViewingTask(task)}
                       className="p-3 rounded-2xl bg-secondary/50 hover:bg-secondary/70 cursor-pointer transition-colors"
                     >
                       <div className="flex items-start gap-2">
@@ -327,6 +333,17 @@ export function CalendarView({ tasks, columns, onEditTask, onNewTask }: Calendar
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* View Task Dialog */}
+      <ViewTaskDialog
+        task={viewingTask}
+        open={!!viewingTask}
+        onOpenChange={(open) => !open && setViewingTask(null)}
+        onToggleSubtask={onToggleSubtask}
+        onMarkComplete={onMarkComplete}
+        categories={categories}
+        columns={columns}
+      />
     </div>
   );
 }
