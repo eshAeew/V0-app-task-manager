@@ -1214,6 +1214,23 @@ export default function TaskManager() {
   // Check if any filters are active
   const hasActiveFilters = selectedCategory || selectedListId || selectedStatus || filterPriority !== "all" || searchQuery;
 
+  // Get all columns combined (global + all list-specific) - used for calendar view
+  const allColumnsCombined = useMemo(() => {
+    const combinedColumns = [...columns];
+    const columnIds = new Set(columns.map(c => c.id));
+    customLists.forEach((list) => {
+      if (list.columns) {
+        list.columns.forEach((col) => {
+          if (!columnIds.has(col.id)) {
+            combinedColumns.push(col);
+            columnIds.add(col.id);
+          }
+        });
+      }
+    });
+    return combinedColumns;
+  }, [columns, customLists]);
+
   // Get active columns: use list-specific columns if a list is selected and has columns, otherwise use global columns
   // When viewing "All Tasks" (no list selected), show all columns from global + all lists combined
   const selectedList = customLists.find((l) => l.id === selectedListId);
@@ -1317,6 +1334,7 @@ export default function TaskManager() {
               >
                 <CalendarView
                   tasks={tasks}
+                  columns={allColumnsCombined}
                   onEditTask={handleEditTask}
                   onNewTask={handleNewTaskWithDate}
                 />
