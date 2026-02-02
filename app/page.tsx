@@ -844,37 +844,66 @@ export default function TaskManager() {
 
   const handleDropStatusToList = (statusId: string, listId: string) => {
     const list = customLists.find((l) => l.id === listId);
-    const statusColumn = columns.find((c) => c.id === statusId);
+    // Check both global columns and list-specific columns
+    const globalColumn = columns.find((c) => c.id === statusId);
+    const sourceList = customLists.find((l) => l.columns?.some((c) => c.id === statusId));
+    const sourceListColumn = sourceList?.columns?.find((c) => c.id === statusId);
+    const statusColumn = globalColumn || sourceListColumn;
+    
     if (list && statusColumn) {
-      // Find all tasks with this status that aren't already in the list
+      // Find all tasks with this status (from any list or no list for global statuses)
       const tasksToMove = tasks.filter(
-        (t) => t.status === statusId && t.listId !== listId && !t.isDeleted && !t.isArchived
+        (t) => t.status === statusId && !t.isDeleted && !t.isArchived
       );
       
-      if (tasksToMove.length === 0) {
-        showToast("No tasks to move", `No tasks with status "${statusColumn.title}" to move`);
-        return;
-      }
-
-      // Get target status for the list
-      const listColumns = list.columns && list.columns.length > 0 ? list.columns : columns;
-      const targetStatus = listColumns.some((c) => c.id === statusId) 
-        ? statusId 
-        : listColumns[0]?.id || statusId;
+      // Clone the status column to the target list if it doesn't exist there
+      const listColumns = list.columns || [];
+      const statusExistsInTargetList = listColumns.some((c) => c.id === statusId);
       
+      if (!statusExistsInTargetList) {
+        // Add the status column to the target list
+        const newColumn: Column = {
+          ...statusColumn,
+          id: statusColumn.id, // Keep the same ID so tasks stay linked
+        };
+        
+        setCustomLists(customLists.map((l) => {
+          if (l.id === listId) {
+            const existingColumns = l.columns || [];
+            return { ...l, columns: [...existingColumns, newColumn] };
+          }
+          // If this was a list-specific column, remove it from the source list
+          if (sourceList && l.id === sourceList.id && sourceListColumn) {
+            const remainingColumns = (l.columns || []).filter((c) => c.id !== statusId);
+            // Only remove if there are other columns remaining
+            if (remainingColumns.length > 0) {
+              return { ...l, columns: remainingColumns };
+            }
+          }
+          return l;
+        }));
+        
+        // If it was a global column, remove it from global columns
+        if (globalColumn) {
+          setColumns(columns.filter((c) => c.id !== statusId));
+        }
+      }
+      
+      // Move all tasks with this status to the target list
       setTasks(tasks.map((t) => 
-        tasksToMove.some((m) => m.id === t.id) 
-          ? { ...t, listId, status: targetStatus } 
+        t.status === statusId && !t.isDeleted && !t.isArchived
+          ? { ...t, listId } 
           : t
       ));
       
+      const taskCount = tasksToMove.length;
       showToast(
-        "Tasks moved to list", 
-        `${tasksToMove.length} task${tasksToMove.length > 1 ? 's' : ''} from "${statusColumn.title}" added to "${list.name}"`
+        "Status moved to list", 
+        `"${statusColumn.title}" with ${taskCount} task${taskCount !== 1 ? 's' : ''} moved to "${list.name}"`
       );
       addActivityLog(
-        "Bulk Move to List", 
-        `Moved ${tasksToMove.length} tasks from "${statusColumn.title}" to list "${list.name}"`
+        "Status Moved to List", 
+        `Moved status "${statusColumn.title}" with ${taskCount} tasks to list "${list.name}"`
       );
     }
   };
@@ -1165,13 +1194,33 @@ export default function TaskManager() {
   const hasActiveFilters = selectedCategory || selectedListId || selectedStatus || filterPriority !== "all" || searchQuery;
 
   // Get active columns: use list-specific columns if a list is selected and has columns, otherwise use global columns
+  // When viewing "All Tasks" (no list selected), show all columns from global + all lists combined
   const selectedList = customLists.find((l) => l.id === selectedListId);
   const activeColumns = useMemo(() => {
     if (selectedListId && selectedList?.columns && selectedList.columns.length > 0) {
       return selectedList.columns;
     }
+    // When no list is selected (All Tasks view), combine global columns with all list-specific columns
+    if (!selectedListId) {
+      const allColumns = [...columns];
+      const columnIds = new Set(columns.map(c => c.id));
+      
+      // Add list-specific columns that don't exist in global columns
+      customLists.forEach((list) => {
+        if (list.columns) {
+          list.columns.forEach((col) => {
+            if (!columnIds.has(col.id)) {
+              allColumns.push(col);
+              columnIds.add(col.id);
+            }
+          });
+        }
+      });
+      
+      return allColumns;
+    }
     return columns;
-  }, [selectedListId, selectedList?.columns, columns]);
+  }, [selectedListId, selectedList?.columns, columns, customLists]);
 
   // Show loading state
   if (!isHydrated) {
