@@ -38,7 +38,15 @@ import {
   Trash2,
   List,
   Tag,
+  ChevronDown,
+  ChevronRight,
+  GripVertical,
 } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 interface AppSidebarProps {
   selectedCategory: string | null;
@@ -73,6 +81,9 @@ interface AppSidebarProps {
   onAddListColumn: (listId: string, column: Column) => void;
   onUpdateListColumn: (listId: string, column: Column) => void;
   onDeleteListColumn: (listId: string, columnId: string) => void;
+  // Drag and drop to lists
+  onDropTaskToList?: (taskId: string, listId: string) => void;
+  onDropStatusToList?: (statusId: string, listId: string) => void;
 }
 
 const iconMap: Record<string, React.ElementType> = {
@@ -120,11 +131,19 @@ export function AppSidebar({
   onAddListColumn,
   onUpdateListColumn,
   onDeleteListColumn,
+  onDropTaskToList,
+  onDropStatusToList,
 }: AppSidebarProps) {
   const [showNewListDialog, setShowNewListDialog] = useState(false);
   const [editingList, setEditingList] = useState<CustomList | null>(null);
   const [newListName, setNewListName] = useState("");
   const [newListColor, setNewListColor] = useState(LIST_COLORS[0]);
+  const [dragOverListId, setDragOverListId] = useState<string | null>(null);
+  
+  // Collapsible states
+  const [listsExpanded, setListsExpanded] = useState(true);
+  const [categoriesExpanded, setCategoriesExpanded] = useState(true);
+  const [statusExpanded, setStatusExpanded] = useState(true);
 
   // Category dialog state
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
@@ -352,11 +371,15 @@ export function AppSidebar({
         ))}
 
         {/* Custom Lists */}
-        <div className="pt-4 mt-4 border-t border-sidebar-border">
+        <Collapsible open={listsExpanded} onOpenChange={setListsExpanded} className="pt-4 mt-4 border-t border-sidebar-border">
           <div className="flex items-center justify-between px-3 mb-2">
-            <p className="text-xs font-medium text-sidebar-foreground/50 uppercase tracking-wider">
-              Lists
-            </p>
+            <CollapsibleTrigger asChild>
+              <button className="flex items-center gap-1 text-xs font-medium text-sidebar-foreground/50 uppercase tracking-wider hover:text-sidebar-foreground/70 transition-colors">
+                {listsExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                Lists
+                <span className="text-[10px] ml-1">({customLists.length})</span>
+              </button>
+            </CollapsibleTrigger>
             <Button
               variant="ghost"
               size="icon"
@@ -367,107 +390,58 @@ export function AppSidebar({
             </Button>
           </div>
 
-          <div className="space-y-1">
-            {customLists.map((list) => (
-              <div key={list.id} className="group relative">
-                <Button
-                  variant="ghost"
-                  className={cn(
-                    "w-full justify-start gap-3 rounded-xl h-11 px-3",
-                    "hover:bg-sidebar-accent text-sidebar-foreground",
-                    selectedListId === list.id && "bg-sidebar-accent"
-                  )}
-                  onClick={() => {
-                    onSelectList(list.id);
-                    onViewModeChange("all");
-                    onCategorySelect(null);
+          <CollapsibleContent>
+            <div className="space-y-1">
+              {customLists.map((list) => (
+                <div 
+                  key={list.id} 
+                  className="group relative"
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setDragOverListId(list.id);
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    setDragOverListId(null);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const taskId = e.dataTransfer.getData("taskId");
+                    const statusId = e.dataTransfer.getData("statusId");
+                    if (taskId && onDropTaskToList) {
+                      onDropTaskToList(taskId, list.id);
+                    } else if (statusId && onDropStatusToList) {
+                      onDropStatusToList(statusId, list.id);
+                    }
+                    setDragOverListId(null);
                   }}
                 >
-                  <div
-                    className="w-5 h-5 rounded-lg flex items-center justify-center"
-                    style={{ backgroundColor: `${list.color}20` }}
-                  >
-                    <List className="h-3.5 w-3.5" style={{ color: list.color }} />
-                  </div>
-                  <span className="flex-1 text-left truncate">{list.name}</span>
-                </Button>
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="rounded-xl">
-                    <DropdownMenuItem onClick={() => openEditListDialog(list)}>
-                      <Pencil className="h-4 w-4 mr-2" />
-                      Rename
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => onDeleteList(list.id)}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Categories */}
-        <div className="pt-4 mt-4 border-t border-sidebar-border">
-          <div className="flex items-center justify-between px-3 mb-2">
-            <p className="text-xs font-medium text-sidebar-foreground/50 uppercase tracking-wider">
-              Categories
-            </p>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 rounded-lg"
-              onClick={() => setShowCategoryDialog(true)}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-
-          <div className="space-y-1">
-            {categories.map((category) => {
-              const Icon = iconMap[category.icon] || Tag;
-              const count = taskCounts[category.id] || 0;
-
-              return (
-                <div key={category.id} className="group relative">
                   <Button
                     variant="ghost"
                     className={cn(
-                      "w-full justify-start gap-3 rounded-xl h-11 px-3 pr-9",
+                      "w-full justify-start gap-3 rounded-xl h-11 px-3 pr-9 transition-all",
                       "hover:bg-sidebar-accent text-sidebar-foreground",
-                      selectedCategory === category.id && "bg-sidebar-accent"
+                      selectedListId === list.id && "bg-sidebar-accent",
+                      dragOverListId === list.id && "bg-primary/20 ring-2 ring-primary ring-inset"
                     )}
                     onClick={() => {
-                      onCategorySelect(category.id);
+                      onSelectList(list.id);
                       onViewModeChange("all");
-                      onSelectList(null);
+                      onCategorySelect(null);
                     }}
                   >
                     <div
                       className="w-5 h-5 rounded-lg flex items-center justify-center"
-                      style={{ backgroundColor: `${category.color}20` }}
+                      style={{ backgroundColor: `${list.color}20` }}
                     >
-                      <Icon
-                        className="h-3.5 w-3.5"
-                        style={{ color: category.color }}
-                      />
+                      <List className="h-3.5 w-3.5" style={{ color: list.color }} />
                     </div>
-                    <span className="flex-1 text-left truncate">{category.name}</span>
-                    <span className="text-xs text-sidebar-foreground/50 shrink-0">{count}</span>
+                    <span className="flex-1 text-left truncate">{list.name}</span>
+                    {dragOverListId === list.id && (
+                      <span className="text-xs text-primary font-medium shrink-0">Drop here</span>
+                    )}
                   </Button>
 
                   <DropdownMenu>
@@ -481,12 +455,12 @@ export function AppSidebar({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="rounded-xl">
-                      <DropdownMenuItem onClick={() => openEditCategoryDialog(category)}>
+                      <DropdownMenuItem onClick={() => openEditListDialog(list)}>
                         <Pencil className="h-4 w-4 mr-2" />
-                        Edit
+                        Rename
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => onDeleteCategory(category.id)}
+                        onClick={() => onDeleteList(list.id)}
                         className="text-destructive focus:text-destructive"
                       >
                         <Trash2 className="h-4 w-4 mr-2" />
@@ -495,24 +469,113 @@ export function AppSidebar({
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-              );
-            })}
+              ))}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+
+        {/* Categories */}
+        <Collapsible open={categoriesExpanded} onOpenChange={setCategoriesExpanded} className="pt-4 mt-4 border-t border-sidebar-border">
+          <div className="flex items-center justify-between px-3 mb-2">
+            <CollapsibleTrigger asChild>
+              <button className="flex items-center gap-1 text-xs font-medium text-sidebar-foreground/50 uppercase tracking-wider hover:text-sidebar-foreground/70 transition-colors">
+                {categoriesExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                Categories
+                <span className="text-[10px] ml-1">({categories.length})</span>
+              </button>
+            </CollapsibleTrigger>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 rounded-lg"
+              onClick={() => setShowCategoryDialog(true)}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
           </div>
-        </div>
+
+          <CollapsibleContent>
+            <div className="space-y-1">
+              {categories.map((category) => {
+                const Icon = iconMap[category.icon] || Tag;
+                const count = taskCounts[category.id] || 0;
+
+                return (
+                  <div key={category.id} className="group relative">
+                    <Button
+                      variant="ghost"
+                      className={cn(
+                        "w-full justify-start gap-3 rounded-xl h-11 px-3 pr-9",
+                        "hover:bg-sidebar-accent text-sidebar-foreground",
+                        selectedCategory === category.id && "bg-sidebar-accent"
+                      )}
+                      onClick={() => {
+                        onCategorySelect(category.id);
+                        onViewModeChange("all");
+                        onSelectList(null);
+                      }}
+                    >
+                      <div
+                        className="w-5 h-5 rounded-lg flex items-center justify-center"
+                        style={{ backgroundColor: `${category.color}20` }}
+                      >
+                        <Icon
+                          className="h-3.5 w-3.5"
+                          style={{ color: category.color }}
+                        />
+                      </div>
+                      <span className="flex-1 text-left truncate">{category.name}</span>
+                      <span className="text-xs text-sidebar-foreground/50 shrink-0">{count}</span>
+                    </Button>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-sidebar-accent/50"
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="rounded-xl">
+                        <DropdownMenuItem onClick={() => openEditCategoryDialog(category)}>
+                          <Pencil className="h-4 w-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => onDeleteCategory(category.id)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                );
+              })}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
 
         {/* Status Quick Filters */}
-        <div className="pt-4 mt-4 border-t border-sidebar-border">
+        <Collapsible open={statusExpanded} onOpenChange={setStatusExpanded} className="pt-4 mt-4 border-t border-sidebar-border">
           <div className="flex items-center justify-between px-3 mb-2">
-            <div className="flex flex-col">
-              <p className="text-xs font-medium text-sidebar-foreground/50 uppercase tracking-wider">
-                Status
-              </p>
-              {selectedListId && (
-                <p className="text-[10px] text-sidebar-foreground/40">
-                  {isUsingListColumns ? `For "${selectedList?.name}"` : "Using global statuses"}
-                </p>
-              )}
-            </div>
+            <CollapsibleTrigger asChild>
+              <button className="flex items-center gap-1 text-xs font-medium text-sidebar-foreground/50 uppercase tracking-wider hover:text-sidebar-foreground/70 transition-colors">
+                {statusExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                <div className="flex flex-col items-start">
+                  <span>Status</span>
+                  {selectedListId && (
+                    <span className="text-[10px] text-sidebar-foreground/40 normal-case tracking-normal">
+                      {isUsingListColumns ? `For "${selectedList?.name}"` : "Using global"}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[10px] ml-1">({activeColumns.length})</span>
+              </button>
+            </CollapsibleTrigger>
             <Button
               variant="ghost"
               size="icon"
@@ -523,64 +586,75 @@ export function AppSidebar({
               <Plus className="h-4 w-4" />
             </Button>
           </div>
-          <div className="space-y-1">
-            {activeColumns.map((column) => (
-              <div key={column.id} className="group relative">
-                <Button
-                  variant="ghost"
-                  className={cn(
-                    "w-full justify-start gap-3 rounded-xl h-10 px-3",
-                    "hover:bg-sidebar-accent text-sidebar-foreground",
-                    selectedStatus === column.id && "bg-sidebar-accent"
-                  )}
-                  onClick={() => {
-                    onStatusSelect(selectedStatus === column.id ? null : column.id);
-                    onViewModeChange("all");
-                    onCategorySelect(null);
-                    // Don't clear list selection when clicking status within a list
-                    if (!selectedListId) {
-                      onSelectList(null);
-                    }
+          <CollapsibleContent>
+            <div className="space-y-1">
+              {activeColumns.map((column) => (
+                <div 
+                  key={column.id} 
+                  className="group relative"
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("statusId", column.id);
+                    e.dataTransfer.effectAllowed = "move";
                   }}
                 >
-                  <div 
-                    className="w-2 h-2 rounded-full" 
-                    style={{ backgroundColor: column.color }}
-                  />
-                  <span className="text-sm flex-1 text-left">{column.title}</span>
-                  <span className="text-xs text-sidebar-foreground/50">
-                    {taskCounts[column.id] || 0}
-                  </span>
-                </Button>
+                  <Button
+                    variant="ghost"
+                    className={cn(
+                      "w-full justify-start gap-3 rounded-xl h-10 px-3 pr-9",
+                      "hover:bg-sidebar-accent text-sidebar-foreground",
+                      selectedStatus === column.id && "bg-sidebar-accent"
+                    )}
+                    onClick={() => {
+                      onStatusSelect(selectedStatus === column.id ? null : column.id);
+                      onViewModeChange("all");
+                      onCategorySelect(null);
+                      // Don't clear list selection when clicking status within a list
+                      if (!selectedListId) {
+                        onSelectList(null);
+                      }
+                    }}
+                  >
+                    <GripVertical className="h-3 w-3 text-sidebar-foreground/30 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab" />
+                    <div 
+                      className="w-2 h-2 rounded-full" 
+                      style={{ backgroundColor: column.color }}
+                    />
+                    <span className="text-sm flex-1 text-left truncate">{column.title}</span>
+                    <span className="text-xs text-sidebar-foreground/50 shrink-0">
+                      {taskCounts[column.id] || 0}
+                    </span>
+                  </Button>
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="rounded-xl">
-                    <DropdownMenuItem onClick={() => openEditColumnDialog(column)}>
-                      <Pencil className="h-4 w-4 mr-2" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => handleDeleteColumnClick(column.id)}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            ))}
-          </div>
-        </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-sidebar-accent/50"
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="rounded-xl">
+                      <DropdownMenuItem onClick={() => openEditColumnDialog(column)}>
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleDeleteColumnClick(column.id)}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              ))}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       </nav>
 
       {/* New/Edit List Dialog */}
