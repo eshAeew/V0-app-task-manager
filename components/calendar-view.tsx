@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import type { Task, Status } from "@/lib/types";
+import type { Task, Status, Column } from "@/lib/types";
 import { PRIORITIES } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -16,11 +16,12 @@ import {
 
 interface CalendarViewProps {
   tasks: Task[];
+  columns: Column[];
   onEditTask: (task: Task) => void;
   onNewTask: (date: string) => void;
 }
 
-export function CalendarView({ tasks, onEditTask, onNewTask }: CalendarViewProps) {
+export function CalendarView({ tasks, columns, onEditTask, onNewTask }: CalendarViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
@@ -274,6 +275,7 @@ export function CalendarView({ tasks, onEditTask, onNewTask }: CalendarViewProps
               {selectedDateTasks.length > 0 ? (
                 selectedDateTasks.map((task) => {
                   const priority = PRIORITIES.find((p) => p.value === task.priority);
+                  const status = columns.find((c) => c.id === task.status);
                   return (
                     <motion.div
                       key={task.id}
@@ -295,7 +297,7 @@ export function CalendarView({ tasks, onEditTask, onNewTask }: CalendarViewProps
                           )}
                           <div className="flex items-center gap-2 mt-2">
                             <Badge variant="secondary" className="text-[10px]">
-                              {task.status}
+                              {status?.title || task.status}
                             </Badge>
                             {task.subtasks && task.subtasks.length > 0 && (
                               <span className="text-[10px] text-muted-foreground">

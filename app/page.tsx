@@ -925,26 +925,52 @@ export default function TaskManager() {
     );
   };
 
-  // Export data
+  // Export data - Full backup including ALL app data
   const handleExportData = (format: "json" | "csv") => {
-    const data = {
+    // Gather ALL app data for complete backup
+    const fullData = {
+      // Version for future compatibility
+      version: "1.0",
+      exportDate: new Date().toISOString(),
+      
+      // Core data
       tasks,
       customLists,
       categories,
       columns,
       templates,
-      exportDate: new Date().toISOString(),
+      collapsedColumns,
+      notifications,
+      
+      // View preferences
+      view,
+      viewMode,
+      boardViewType,
+      sortBy,
+      sortOrder,
+      isCompactView,
+      
+      // Bento widgets and settings (from storage)
+      bentoWidgets: storage.getBentoWidgets<unknown>(null),
+      quickNotes: storage.getQuickNotes(""),
+      dailyIntention: storage.getDailyIntention(""),
+      mood: storage.getMood(null),
+      pomodoroDuration: storage.getPomodoroDuration(25),
+      clockFormat: storage.getClockFormat("12h"),
+      userLocation: storage.getUserLocation<unknown>(null),
+      activityLogs: storage.getActivityLogs<unknown>([]),
     };
 
     if (format === "json") {
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const blob = new Blob([JSON.stringify(fullData, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `task-manager-export-${new Date().toISOString().split("T")[0]}.json`;
+      a.download = `bento-full-backup-${new Date().toISOString().split("T")[0]}.json`;
       a.click();
       URL.revokeObjectURL(url);
     } else {
+      // CSV export is tasks only (for spreadsheet compatibility)
       const csvRows = [
         ["Title", "Description", "Status", "Priority", "Category", "Due Date", "Tags", "Created"],
         ...tasks.map((t) => [
@@ -972,7 +998,7 @@ export default function TaskManager() {
     setShowExportDialog(false);
   };
 
-  // Import data
+  // Import data - Full restore of ALL app data
   const handleImportData = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -981,11 +1007,80 @@ export default function TaskManager() {
     reader.onload = (event) => {
       try {
         const data = JSON.parse(event.target?.result as string);
+        let importedCount = 0;
+        
+        // Core data
         if (data.tasks) {
           setTasks(data.tasks);
-          showToast("Data imported", `${data.tasks.length} tasks imported`);
-          addActivityLog("Data Imported", `${data.tasks.length} tasks imported`);
+          importedCount += data.tasks.length;
         }
+        if (data.customLists) {
+          setCustomLists(data.customLists);
+        }
+        if (data.categories) {
+          setCategories(data.categories);
+        }
+        if (data.columns) {
+          setColumns(data.columns);
+        }
+        if (data.templates) {
+          setTemplates(data.templates);
+        }
+        if (data.collapsedColumns) {
+          setCollapsedColumns(data.collapsedColumns);
+        }
+        if (data.notifications) {
+          setNotifications(data.notifications);
+        }
+        
+        // View preferences
+        if (data.view) {
+          setView(data.view);
+        }
+        if (data.viewMode) {
+          setViewMode(data.viewMode);
+        }
+        if (data.boardViewType) {
+          setBoardViewType(data.boardViewType);
+        }
+        if (data.sortBy) {
+          setSortBy(data.sortBy);
+        }
+        if (data.sortOrder) {
+          setSortOrder(data.sortOrder);
+        }
+        if (typeof data.isCompactView === "boolean") {
+          setIsCompactView(data.isCompactView);
+        }
+        
+        // Bento widgets and settings (save to storage)
+        if (data.bentoWidgets) {
+          storage.saveBentoWidgets(data.bentoWidgets);
+        }
+        if (data.quickNotes !== undefined) {
+          storage.saveQuickNotes(data.quickNotes);
+        }
+        if (data.dailyIntention !== undefined) {
+          storage.saveDailyIntention(data.dailyIntention);
+        }
+        if (data.mood !== undefined) {
+          storage.saveMood(data.mood);
+        }
+        if (data.pomodoroDuration) {
+          storage.savePomodoroDuration(data.pomodoroDuration);
+        }
+        if (data.clockFormat) {
+          storage.saveClockFormat(data.clockFormat);
+        }
+        if (data.userLocation) {
+          storage.saveUserLocation(data.userLocation);
+        }
+        if (data.activityLogs) {
+          storage.saveActivityLogs(data.activityLogs);
+        }
+        
+        showToast("Full backup restored", `${importedCount} tasks + all settings imported`);
+        addActivityLog("Full Backup Restored", `Imported ${importedCount} tasks, ${data.customLists?.length || 0} lists, ${data.categories?.length || 0} categories, ${data.columns?.length || 0} columns`);
       } catch {
         showToast("Import failed", "Invalid file format");
       }
@@ -1214,6 +1309,23 @@ export default function TaskManager() {
   // Check if any filters are active
   const hasActiveFilters = selectedCategory || selectedListId || selectedStatus || filterPriority !== "all" || searchQuery;
 
+  // Get all columns combined (global + all list-specific) - used for calendar view
+  const allColumnsCombined = useMemo(() => {
+    const combinedColumns = [...columns];
+    const columnIds = new Set(columns.map(c => c.id));
+    customLists.forEach((list) => {
+      if (list.columns) {
+        list.columns.forEach((col) => {
+          if (!columnIds.has(col.id)) {
+            combinedColumns.push(col);
+            columnIds.add(col.id);
+          }
+        });
+      }
+    });
+    return combinedColumns;
+  }, [columns, customLists]);
+
   // Get active columns: use list-specific columns if a list is selected and has columns, otherwise use global columns
   // When viewing "All Tasks" (no list selected), show all columns from global + all lists combined
   const selectedList = customLists.find((l) => l.id === selectedListId);
@@ -1317,6 +1429,7 @@ export default function TaskManager() {
               >
                 <CalendarView
                   tasks={tasks}
+                  columns={allColumnsCombined}
                   onEditTask={handleEditTask}
                   onNewTask={handleNewTaskWithDate}
                 />
@@ -1832,34 +1945,34 @@ export default function TaskManager() {
       <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
         <DialogContent className="rounded-2xl">
           <DialogHeader>
-            <DialogTitle>Export Data</DialogTitle>
+            <DialogTitle>Export / Import Data</DialogTitle>
             <DialogDescription>
-              Download your tasks and settings
+              Backup or restore all your data including tasks, lists, categories, columns, and settings
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <Button
                 variant="outline"
-                className="h-24 flex-col gap-2 bg-transparent"
+                className="h-28 flex-col gap-2 bg-transparent"
                 onClick={() => handleExportData("json")}
               >
                 <Download className="h-6 w-6" />
-                <span>Export JSON</span>
-                <span className="text-xs text-muted-foreground">Full backup</span>
+                <span className="font-medium">Export JSON</span>
+                <span className="text-xs text-muted-foreground text-center">Complete backup with all data</span>
               </Button>
               <Button
                 variant="outline"
-                className="h-24 flex-col gap-2 bg-transparent"
+                className="h-28 flex-col gap-2 bg-transparent"
                 onClick={() => handleExportData("csv")}
               >
                 <Download className="h-6 w-6" />
-                <span>Export CSV</span>
-                <span className="text-xs text-muted-foreground">Tasks only</span>
+                <span className="font-medium">Export CSV</span>
+                <span className="text-xs text-muted-foreground text-center">Tasks only (spreadsheet)</span>
               </Button>
             </div>
             <div className="border-t pt-4">
-              <p className="text-sm text-muted-foreground mb-2">Import data</p>
+              <p className="text-sm text-muted-foreground mb-2">Import full backup</p>
               <label className="flex items-center gap-2 cursor-pointer">
                 <Button variant="outline" size="sm" asChild>
                   <span>
