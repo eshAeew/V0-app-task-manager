@@ -328,7 +328,7 @@ export function TaskCard({
 
       {/* Description with markdown - hide in compact mode */}
       {!isCompact && task.description && (
-        <TooltipProvider delayDuration={1900}>
+        <TooltipProvider delayDuration={3000}>
           <Tooltip>
             <TooltipTrigger asChild>
               <div 
