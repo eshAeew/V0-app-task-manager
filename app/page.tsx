@@ -1328,9 +1328,33 @@ export default function TaskManager() {
                   </div>
                 </div>
 
-                {/* Sticky Bottom Toolbar */}
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 print:hidden">
+                {/* Draggable Floating Toolbar */}
+                <motion.div 
+                  drag
+                  dragMomentum={false}
+                  dragElastic={0}
+                  whileDrag={{ scale: 1.02, cursor: "grabbing" }}
+                  initial={{ x: "-50%", y: 0 }}
+                  className="fixed bottom-6 left-1/2 z-50 print:hidden cursor-grab active:cursor-grabbing"
+                >
                   <div className="flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-card/95 backdrop-blur-xl border border-border shadow-2xl shadow-black/20 dark:shadow-black/40">
+                    {/* Drag Handle */}
+                    <div className="flex items-center gap-1 pr-2 border-r border-border mr-1">
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex gap-0.5">
+                          <div className="w-1 h-1 rounded-full bg-muted-foreground/40" />
+                          <div className="w-1 h-1 rounded-full bg-muted-foreground/40" />
+                        </div>
+                        <div className="flex gap-0.5">
+                          <div className="w-1 h-1 rounded-full bg-muted-foreground/40" />
+                          <div className="w-1 h-1 rounded-full bg-muted-foreground/40" />
+                        </div>
+                        <div className="flex gap-0.5">
+                          <div className="w-1 h-1 rounded-full bg-muted-foreground/40" />
+                          <div className="w-1 h-1 rounded-full bg-muted-foreground/40" />
+                        </div>
+                      </div>
+                    </div>
                     {/* Selection Mode Toggle */}
                     <Button
                       variant={isSelectionMode ? "default" : "ghost"}
@@ -1453,7 +1477,7 @@ export default function TaskManager() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
-                </div>
+                </motion.div>
 
                 {/* Bulk Actions Bar */}
                 {isSelectionMode && selectedTaskIds.length > 0 && (
