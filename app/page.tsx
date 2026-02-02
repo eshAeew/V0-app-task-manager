@@ -1307,7 +1307,7 @@ export default function TaskManager() {
                 className="min-w-max"
               >
                 {/* Board Header */}
-                <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 print:hidden">
+                <div className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 print:hidden">
                   <div>
                     <h2 className="text-2xl font-bold text-foreground">
                       {getViewTitle()}
@@ -1326,39 +1326,43 @@ export default function TaskManager() {
                       )}
                     </p>
                   </div>
+                </div>
 
-                  {/* Controls */}
-                  <div className="flex items-center gap-2 flex-wrap">
+                {/* Sticky Bottom Toolbar */}
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 print:hidden">
+                  <div className="flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-card/95 backdrop-blur-xl border border-border shadow-2xl shadow-black/20 dark:shadow-black/40">
                     {/* Selection Mode Toggle */}
                     <Button
-                      variant={isSelectionMode ? "default" : "outline"}
+                      variant={isSelectionMode ? "default" : "ghost"}
                       size="sm"
-                      className="rounded-xl h-9 gap-2"
+                      className="rounded-xl h-8 gap-2 text-xs"
                       onClick={() => {
                         setIsSelectionMode(!isSelectionMode);
                         if (isSelectionMode) setSelectedTaskIds([]);
                       }}
                     >
-                      <CheckSquare className="h-4 w-4" />
+                      <CheckSquare className="h-3.5 w-3.5" />
                       Select
                     </Button>
 
+                    <div className="w-px h-6 bg-border" />
+
                     {/* Compact View Toggle */}
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="icon"
-                      className="rounded-xl h-9 w-9 bg-transparent"
+                      className="rounded-xl h-8 w-8"
                       onClick={() => setIsCompactView(!isCompactView)}
                       title={isCompactView ? "Comfortable view" : "Compact view"}
                     >
-                      {isCompactView ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
+                      {isCompactView ? <Maximize2 className="h-3.5 w-3.5" /> : <Minimize2 className="h-3.5 w-3.5" />}
                     </Button>
 
                     {/* Sort Dropdown */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="outline" className="rounded-xl h-9 gap-2 bg-transparent">
-                          <ArrowUpDown className="h-4 w-4" />
+                        <Button variant="ghost" className="rounded-xl h-8 gap-2 text-xs">
+                          <ArrowUpDown className="h-3.5 w-3.5" />
                           <span className="hidden sm:inline">
                             {sortBy === "priority" ? "Priority" : sortBy === "dueDate" ? "Due Date" : sortBy === "title" ? "Title" : "Created"}
                           </span>
@@ -1382,20 +1386,22 @@ export default function TaskManager() {
 
                     {/* Sort Order Toggle */}
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="icon"
-                      className="rounded-xl h-9 w-9 bg-transparent"
+                      className="rounded-xl h-8 w-8"
                       onClick={toggleSortOrder}
                       title={sortOrder === "asc" ? "Ascending" : "Descending"}
                     >
-                      <SlidersHorizontal className={`h-4 w-4 transition-transform ${sortOrder === "asc" ? "rotate-180" : ""}`} />
+                      <SlidersHorizontal className={`h-3.5 w-3.5 transition-transform ${sortOrder === "asc" ? "rotate-180" : ""}`} />
                     </Button>
+
+                    <div className="w-px h-6 bg-border" />
 
                     {/* Filter by Priority */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="outline" className="rounded-xl h-9 gap-2 bg-transparent">
-                          <Filter className="h-4 w-4" />
+                        <Button variant="ghost" className="rounded-xl h-8 gap-2 text-xs">
+                          <Filter className="h-3.5 w-3.5" />
                           <span className="hidden sm:inline">
                             {filterPriority === "all" ? "All" : filterPriority.charAt(0).toUpperCase() + filterPriority.slice(1)}
                           </span>
@@ -1427,8 +1433,8 @@ export default function TaskManager() {
                     {/* More Actions */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="icon" className="rounded-xl h-9 w-9 bg-transparent">
-                          <LayoutGrid className="h-4 w-4" />
+                        <Button variant="ghost" size="icon" className="rounded-xl h-8 w-8">
+                          <LayoutGrid className="h-3.5 w-3.5" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="rounded-xl w-48">
@@ -1523,7 +1529,7 @@ export default function TaskManager() {
                 </div>
 
                 {/* Kanban Board */}
-                <div className="flex gap-6 print:block print:space-y-4">
+                <div className="flex gap-6 pb-20 print:block print:space-y-4 print:pb-0">
                   {activeColumns.map((column) => (
                     <KanbanColumn
                       key={column.id}
