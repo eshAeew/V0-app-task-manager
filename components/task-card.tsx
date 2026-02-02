@@ -25,6 +25,7 @@ import {
   CheckCircle2,
   Circle,
   Eye,
+  Pencil,
 } from "lucide-react";
 import {
   Tooltip,
@@ -293,11 +294,8 @@ export function TaskCard({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48 rounded-xl">
-            <DropdownMenuItem onClick={() => setShowViewDialog(true)}>
-              <Eye className="h-4 w-4 mr-2" />
-              View Details
-            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onEdit(task)}>
+              <Pencil className="h-4 w-4 mr-2" />
               Edit task
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onDuplicate?.(task)}>
@@ -330,7 +328,7 @@ export function TaskCard({
 
       {/* Description with markdown - hide in compact mode */}
       {!isCompact && task.description && (
-        <TooltipProvider delayDuration={700}>
+        <TooltipProvider delayDuration={1900}>
           <Tooltip>
             <TooltipTrigger asChild>
               <div 
@@ -341,10 +339,10 @@ export function TaskCard({
             <TooltipContent 
               side="bottom" 
               align="start"
-              className="max-w-sm p-3 text-sm bg-popover border shadow-lg rounded-xl"
+              className="max-w-sm p-3 text-sm bg-card text-card-foreground border shadow-lg rounded-xl z-50"
             >
               <div 
-                className="prose prose-sm prose-slate dark:prose-invert max-w-none"
+                className="text-sm text-foreground whitespace-pre-wrap"
                 dangerouslySetInnerHTML={{ __html: parseMarkdown(task.description) }}
               />
             </TooltipContent>
@@ -468,6 +466,18 @@ export function TaskCard({
               title={category.name}
             />
           )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowViewDialog(true);
+            }}
+            title="View details"
+          >
+            <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+          </Button>
         </div>
       </div>
 
@@ -487,12 +497,13 @@ export function TaskCard({
     <ContextMenu>
       <ContextMenuTrigger>{cardContent}</ContextMenuTrigger>
       <ContextMenuContent className="w-48 rounded-xl">
+        <ContextMenuItem onClick={() => onEdit(task)}>
+          <Pencil className="h-4 w-4 mr-2" />
+          Edit task
+        </ContextMenuItem>
         <ContextMenuItem onClick={() => setShowViewDialog(true)}>
           <Eye className="h-4 w-4 mr-2" />
           View Details
-        </ContextMenuItem>
-        <ContextMenuItem onClick={() => onEdit(task)}>
-          Edit task
         </ContextMenuItem>
         <ContextMenuItem onClick={() => onDuplicate?.(task)}>
           <Copy className="h-4 w-4 mr-2" />
