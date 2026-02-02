@@ -998,7 +998,7 @@ export default function TaskManager() {
     setShowExportDialog(false);
   };
 
-  // Import data - Full restore of ALL app data
+  // Import data - Merge imported data with existing data
   const handleImportData = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1007,80 +1007,106 @@ export default function TaskManager() {
     reader.onload = (event) => {
       try {
         const data = JSON.parse(event.target?.result as string);
-        let importedCount = 0;
+        let newTasksCount = 0;
+        let newListsCount = 0;
+        let newCategoriesCount = 0;
+        let newColumnsCount = 0;
         
-        // Core data
-        if (data.tasks) {
-          setTasks(data.tasks);
-          importedCount += data.tasks.length;
-        }
-        if (data.customLists) {
-          setCustomLists(data.customLists);
-        }
-        if (data.categories) {
-          setCategories(data.categories);
-        }
-        if (data.columns) {
-          setColumns(data.columns);
-        }
-        if (data.templates) {
-          setTemplates(data.templates);
-        }
-        if (data.collapsedColumns) {
-          setCollapsedColumns(data.collapsedColumns);
-        }
-        if (data.notifications) {
-          setNotifications(data.notifications);
+        // Helper function to merge arrays by ID (adds new items, keeps existing)
+        const mergeById = <T extends { id: string }>(existing: T[], incoming: T[]): { merged: T[]; newCount: number } => {
+          const existingIds = new Set(existing.map(item => item.id));
+          const newItems = incoming.filter(item => !existingIds.has(item.id));
+          return { merged: [...existing, ...newItems], newCount: newItems.length };
+        };
+        
+        // Merge tasks
+        if (data.tasks && Array.isArray(data.tasks)) {
+          const result = mergeById(tasks, data.tasks);
+          setTasks(result.merged);
+          newTasksCount = result.newCount;
         }
         
-        // View preferences
-        if (data.view) {
-          setView(data.view);
-        }
-        if (data.viewMode) {
-          setViewMode(data.viewMode);
-        }
-        if (data.boardViewType) {
-          setBoardViewType(data.boardViewType);
-        }
-        if (data.sortBy) {
-          setSortBy(data.sortBy);
-        }
-        if (data.sortOrder) {
-          setSortOrder(data.sortOrder);
-        }
-        if (typeof data.isCompactView === "boolean") {
-          setIsCompactView(data.isCompactView);
+        // Merge custom lists
+        if (data.customLists && Array.isArray(data.customLists)) {
+          const result = mergeById(customLists, data.customLists);
+          setCustomLists(result.merged);
+          newListsCount = result.newCount;
         }
         
-        // Bento widgets and settings (save to storage)
-        if (data.bentoWidgets) {
+        // Merge categories
+        if (data.categories && Array.isArray(data.categories)) {
+          const result = mergeById(categories, data.categories);
+          setCategories(result.merged);
+          newCategoriesCount = result.newCount;
+        }
+        
+        // Merge columns
+        if (data.columns && Array.isArray(data.columns)) {
+          const result = mergeById(columns, data.columns);
+          setColumns(result.merged);
+          newColumnsCount = result.newCount;
+        }
+        
+        // Merge templates
+        if (data.templates && Array.isArray(data.templates)) {
+          const result = mergeById(templates, data.templates);
+          setTemplates(result.merged);
+        }
+        
+        // Merge collapsed columns (union of sets)
+        if (data.collapsedColumns && Array.isArray(data.collapsedColumns)) {
+          setCollapsedColumns(prev => [...new Set([...prev, ...data.collapsedColumns])]);
+        }
+        
+        // Merge notifications
+        if (data.notifications && Array.isArray(data.notifications)) {
+          const result = mergeById(notifications, data.notifications);
+          setNotifications(result.merged);
+        }
+        
+        // Merge activity logs (append new ones)
+        if (data.activityLogs && Array.isArray(data.activityLogs)) {
+          const existingLogs = storage.getActivityLogs<Array<{ id: string }>>([]);
+          const existingIds = new Set(existingLogs.map((log: { id: string }) => log.id));
+          const newLogs = data.activityLogs.filter((log: { id: string }) => !existingIds.has(log.id));
+          storage.saveActivityLogs([...existingLogs, ...newLogs]);
+        }
+        
+        // For settings, only import if they don't exist locally (preserve user's current preferences)
+        // Bento widgets - merge if not already configured
+        if (data.bentoWidgets && !storage.getBentoWidgets(null)) {
           storage.saveBentoWidgets(data.bentoWidgets);
         }
-        if (data.quickNotes !== undefined) {
-          storage.saveQuickNotes(data.quickNotes);
-        }
-        if (data.dailyIntention !== undefined) {
-          storage.saveDailyIntention(data.dailyIntention);
-        }
-        if (data.mood !== undefined) {
-          storage.saveMood(data.mood);
-        }
-        if (data.pomodoroDuration) {
-          storage.savePomodoroDuration(data.pomodoroDuration);
-        }
-        if (data.clockFormat) {
-          storage.saveClockFormat(data.clockFormat);
-        }
-        if (data.userLocation) {
-          storage.saveUserLocation(data.userLocation);
-        }
-        if (data.activityLogs) {
-          storage.saveActivityLogs(data.activityLogs);
+        
+        // Quick notes - append if there's content
+        if (data.quickNotes) {
+          const existingNotes = storage.getQuickNotes("");
+          if (existingNotes && data.quickNotes !== existingNotes) {
+            storage.saveQuickNotes(existingNotes + "\n\n--- Imported Notes ---\n" + data.quickNotes);
+          } else if (!existingNotes) {
+            storage.saveQuickNotes(data.quickNotes);
+          }
         }
         
-        showToast("Full backup restored", `${importedCount} tasks + all settings imported`);
-        addActivityLog("Full Backup Restored", `Imported ${importedCount} tasks, ${data.customLists?.length || 0} lists, ${data.categories?.length || 0} categories, ${data.columns?.length || 0} columns`);
+        // Daily intention - keep existing if set
+        if (data.dailyIntention && !storage.getDailyIntention("")) {
+          storage.saveDailyIntention(data.dailyIntention);
+        }
+        
+        // Other settings - only import if not already set
+        if (data.mood && !storage.getMood(null)) {
+          storage.saveMood(data.mood);
+        }
+        if (data.pomodoroDuration && storage.getPomodoroDuration(25) === 25) {
+          storage.savePomodoroDuration(data.pomodoroDuration);
+        }
+        if (data.userLocation && !storage.getUserLocation(null)) {
+          storage.saveUserLocation(data.userLocation);
+        }
+        
+        const totalNew = newTasksCount + newListsCount + newCategoriesCount + newColumnsCount;
+        showToast("Data merged successfully", `Added ${newTasksCount} tasks, ${newListsCount} lists, ${newCategoriesCount} categories, ${newColumnsCount} columns`);
+        addActivityLog("Data Merged", `Added ${newTasksCount} new tasks, ${newListsCount} new lists, ${newCategoriesCount} new categories, ${newColumnsCount} new columns`);
       } catch {
         showToast("Import failed", "Invalid file format");
       }
@@ -1947,7 +1973,7 @@ export default function TaskManager() {
           <DialogHeader>
             <DialogTitle>Export / Import Data</DialogTitle>
             <DialogDescription>
-              Backup or restore all your data including tasks, lists, categories, columns, and settings
+              Backup your data or import to merge with existing data (duplicates are skipped)
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -1972,7 +1998,7 @@ export default function TaskManager() {
               </Button>
             </div>
             <div className="border-t pt-4">
-              <p className="text-sm text-muted-foreground mb-2">Import full backup</p>
+              <p className="text-sm text-muted-foreground mb-2">Import and merge data (JSON only)</p>
               <label className="flex items-center gap-2 cursor-pointer">
                 <Button variant="outline" size="sm" asChild>
                   <span>
