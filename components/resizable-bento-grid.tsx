@@ -65,7 +65,6 @@ import {
   CloudSun,
   CloudMoon,
   Droplets,
-  Thermometer,
   Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -488,28 +487,22 @@ const WeatherWidget = memo(function WeatherWidget() {
     const fetchWeather = async (lat: number, lng: number) => {
       if (!isMounted) return;
       setStatusMessage("Fetching weather data...");
-      console.log("[v0] Fetching weather for:", lat, lng);
       
       try {
         const response = await fetch(`/api/weather?lat=${lat}&lng=${lng}`);
-        console.log("[v0] Weather API response status:", response.status);
         
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error("[v0] Weather API error:", errorText);
           throw new Error("Failed to fetch weather");
         }
         
         const data = await response.json();
-        console.log("[v0] Weather data received:", data);
         
         if (isMounted) {
           setWeather(data);
           setLocationStatus("granted");
           setLoading(false);
         }
-      } catch (e) {
-        console.error("[v0] Weather fetch error:", e);
+      } catch {
         if (isMounted) {
           setError("Failed to load weather data");
           setLocationStatus("denied");
@@ -521,17 +514,14 @@ const WeatherWidget = memo(function WeatherWidget() {
     const getLocation = () => {
       setStatusMessage("Checking saved location...");
       const savedLocation = storage.getUserLocation<{ lat?: number; lng?: number } | null>(null);
-      console.log("[v0] Saved location:", savedLocation);
       
       if (savedLocation?.lat && savedLocation?.lng) {
         fetchWeather(savedLocation.lat, savedLocation.lng);
       } else if (navigator.geolocation) {
         setStatusMessage("Requesting location access...");
-        console.log("[v0] Requesting geolocation...");
         
         navigator.geolocation.getCurrentPosition(
           (position) => {
-            console.log("[v0] Geolocation success:", position.coords);
             const { latitude, longitude } = position.coords;
             storage.saveUserLocation({ 
               lat: latitude, 
@@ -540,7 +530,6 @@ const WeatherWidget = memo(function WeatherWidget() {
             fetchWeather(latitude, longitude);
           },
           (err) => {
-            console.error("[v0] Geolocation error:", err.code, err.message);
             if (isMounted) {
               setError(`Location error: ${err.message}`);
               setLocationStatus("denied");
@@ -554,7 +543,6 @@ const WeatherWidget = memo(function WeatherWidget() {
           }
         );
       } else {
-        console.error("[v0] Geolocation not supported");
         if (isMounted) {
           setError("Geolocation not supported");
           setLocationStatus("denied");
@@ -611,11 +599,14 @@ const WeatherWidget = memo(function WeatherWidget() {
   });
   const dayString = now.toLocaleDateString("en-US", { weekday: "long" });
 
-  // Find min/max temps for chart scaling
-  const hourlyTemps = weather.hourly.map(h => h.temp);
+  // Find min/max temps for chart scaling - with safety checks
+  const hourlyData = weather.hourly && weather.hourly.length > 0 ? weather.hourly : [{ time: "Now", temp: weather.current.temp }];
+  const hourlyTemps = hourlyData.map(h => h.temp);
   const minTemp = Math.min(...hourlyTemps);
   const maxTemp = Math.max(...hourlyTemps);
   const tempRange = maxTemp - minTemp || 1;
+  
+  const dailyData = weather.daily && weather.daily.length > 0 ? weather.daily : [];
 
   return (
     <div className="h-full flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-xl overflow-hidden text-white">
@@ -713,42 +704,46 @@ const WeatherWidget = memo(function WeatherWidget() {
                 </defs>
                 
                 {/* Area fill */}
-                <path
-                  d={`
-                    M 0,${100 - ((weather.hourly[0]?.temp - minTemp) / tempRange) * 80}
-                    ${weather.hourly.slice(0, 12).map((h, i) => {
-                      const x = (i / 11) * 100;
-                      const y = 100 - ((h.temp - minTemp) / tempRange) * 80;
-                      return `L ${x},${y}`;
-                    }).join(" ")}
-                    L 100,100 L 0,100 Z
-                  `}
-                  fill="url(#tempGradient)"
-                  className="opacity-60"
-                />
+                {hourlyData.length > 1 && (
+                  <path
+                    d={`
+                      M 0,${100 - ((hourlyData[0]?.temp - minTemp) / tempRange) * 80}
+                      ${hourlyData.slice(0, 12).map((h, i) => {
+                        const x = (i / Math.max(hourlyData.slice(0, 12).length - 1, 1)) * 100;
+                        const y = 100 - ((h.temp - minTemp) / tempRange) * 80;
+                        return `L ${x},${y}`;
+                      }).join(" ")}
+                      L 100,100 L 0,100 Z
+                    `}
+                    fill="url(#tempGradient)"
+                    className="opacity-60"
+                  />
+                )}
                 
                 {/* Line */}
-                <path
-                  d={`
-                    M 0,${100 - ((weather.hourly[0]?.temp - minTemp) / tempRange) * 80}
-                    ${weather.hourly.slice(0, 12).map((h, i) => {
-                      const x = (i / 11) * 100;
-                      const y = 100 - ((h.temp - minTemp) / tempRange) * 80;
-                      return `L ${x},${y}`;
-                    }).join(" ")}
-                  `}
-                  fill="none"
-                  stroke="rgb(234 179 8)"
-                  strokeWidth="2"
-                  vectorEffect="non-scaling-stroke"
-                />
+                {hourlyData.length > 1 && (
+                  <path
+                    d={`
+                      M 0,${100 - ((hourlyData[0]?.temp - minTemp) / tempRange) * 80}
+                      ${hourlyData.slice(0, 12).map((h, i) => {
+                        const x = (i / Math.max(hourlyData.slice(0, 12).length - 1, 1)) * 100;
+                        const y = 100 - ((h.temp - minTemp) / tempRange) * 80;
+                        return `L ${x},${y}`;
+                      }).join(" ")}
+                    `}
+                    fill="none"
+                    stroke="rgb(234 179 8)"
+                    strokeWidth="2"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                )}
               </svg>
             </div>
           </div>
           
           {/* X-axis labels */}
           <div className="flex justify-between text-[10px] text-slate-500 pt-1 pl-8">
-            {weather.hourly.slice(0, 12).filter((_, i) => i % 3 === 0).map((h, i) => (
+            {hourlyData.slice(0, 12).filter((_, i) => i % 3 === 0).map((h, i) => (
               <span key={i}>{h.time}</span>
             ))}
           </div>
@@ -756,9 +751,10 @@ const WeatherWidget = memo(function WeatherWidget() {
       </div>
 
       {/* 7-day forecast */}
+      {dailyData.length > 0 && (
       <div className="border-t border-slate-700/50">
         <div className="flex overflow-x-auto scrollbar-hide">
-          {weather.daily.slice(0, 8).map((day, i) => (
+          {dailyData.slice(0, 8).map((day, i) => (
             <div
               key={day.date}
               className={cn(
@@ -779,6 +775,7 @@ const WeatherWidget = memo(function WeatherWidget() {
           ))}
         </div>
       </div>
+      )}
 
       {/* Location footer */}
       <div className="flex items-center justify-between px-4 py-2 bg-slate-800/50 text-[10px] text-slate-500">

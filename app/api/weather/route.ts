@@ -82,8 +82,6 @@ export async function GET(request: NextRequest) {
   const lat = searchParams.get("lat");
   const lng = searchParams.get("lng");
 
-  console.log("[v0] Weather API called with lat:", lat, "lng:", lng);
-
   if (!lat || !lng) {
     return NextResponse.json({ error: "Latitude and longitude are required" }, { status: 400 });
   }
@@ -92,24 +90,17 @@ export async function GET(request: NextRequest) {
     // Fetch weather data from Open-Meteo API (free, no API key required)
     const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,is_day&hourly=temperature_2m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=8`;
     
-    console.log("[v0] Fetching from Open-Meteo:", weatherUrl);
-    
     const weatherResponse = await fetch(weatherUrl, {
       headers: {
         "Accept": "application/json",
       },
     });
     
-    console.log("[v0] Open-Meteo response status:", weatherResponse.status);
-    
     if (!weatherResponse.ok) {
-      const errorText = await weatherResponse.text();
-      console.error("[v0] Open-Meteo error:", errorText);
       throw new Error(`Weather API error: ${weatherResponse.status}`);
     }
     
     const weatherData = await weatherResponse.json();
-    console.log("[v0] Weather data received, timezone:", weatherData.timezone);
 
     // Get city name from reverse geocoding
     let cityName = "Your Location";
@@ -130,10 +121,9 @@ export async function GET(request: NextRequest) {
                    geoData.address?.county ||
                    geoData.address?.state ||
                    "Your Location";
-        console.log("[v0] City name resolved:", cityName);
       }
-    } catch (e) {
-      console.error("[v0] Geocoding error:", e);
+    } catch {
+      // Geocoding failed, use default
     }
 
     const isDay = weatherData.current?.is_day === 1;
@@ -197,10 +187,8 @@ export async function GET(request: NextRequest) {
       },
     };
 
-    console.log("[v0] Returning weather data for:", cityName);
     return NextResponse.json(data);
-  } catch (error) {
-    console.error("[v0] Weather API error:", error);
+  } catch {
     return NextResponse.json({ error: "Failed to fetch weather data" }, { status: 500 });
   }
 }
