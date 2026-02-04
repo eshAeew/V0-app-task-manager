@@ -270,10 +270,10 @@ export const AVAILABLE_WIDGETS: BentoWidget[] = [
     id: "weather",
     type: "weather",
     name: "Weather",
-    description: "Current temperature and condition",
+    description: "Full weather with hourly chart, 7-day forecast, humidity, wind",
     category: "utilities",
     icon: "Cloud",
-    defaultSize: "medium",
+    defaultSize: "large",
   },
   {
     id: "clock",

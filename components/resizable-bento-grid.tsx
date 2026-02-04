@@ -56,6 +56,17 @@ import {
   Star,
   Maximize2,
   Minimize2,
+  Moon,
+  CloudRain,
+  CloudSnow,
+  CloudLightning,
+  CloudDrizzle,
+  CloudFog,
+  CloudSun,
+  CloudMoon,
+  Droplets,
+  Thermometer,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { storage } from "@/lib/storage";
@@ -403,43 +414,113 @@ const MiniPollWidget = memo(function MiniPollWidget() {
   );
 });
 
-// Weather widget with location permission
+// Weather data interface
+interface WeatherData {
+  current: {
+    temp: number;
+    condition: string;
+    icon: string;
+    humidity: number;
+    windSpeed: number;
+    precipitation: number;
+    feelsLike: number;
+    uvIndex: number;
+    visibility: number;
+    pressure: number;
+    isDay: boolean;
+  };
+  hourly: Array<{
+    time: string;
+    temp: number;
+  }>;
+  daily: Array<{
+    date: string;
+    day: string;
+    tempMax: number;
+    tempMin: number;
+    condition: string;
+    icon: string;
+  }>;
+  location: {
+    city: string;
+    timezone: string;
+  };
+}
+
+// Weather icon component
+function WeatherIcon({ icon, className }: { icon: string; className?: string }) {
+  const iconMap: Record<string, React.ElementType> = {
+    sun: Sun,
+    moon: Moon,
+    cloud: Cloud,
+    "cloud-sun": CloudSun,
+    "cloud-moon": CloudMoon,
+    "cloud-rain": CloudRain,
+    "cloud-drizzle": CloudDrizzle,
+    "cloud-snow": CloudSnow,
+    "cloud-lightning": CloudLightning,
+    "cloud-fog": CloudFog,
+  };
+  const IconComponent = iconMap[icon] || Sun;
+  return <IconComponent className={className} />;
+}
+
+// Weather widget with location permission - comprehensive view
 const WeatherWidget = memo(function WeatherWidget() {
-  const [weather, setWeather] = useState<{ temp: number; condition: string; city: string } | null>(null);
+  const [weather, setWeather] = useState<WeatherData | null>(null);
   const [locationStatus, setLocationStatus] = useState<"pending" | "granted" | "denied">("pending");
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<"temperature" | "precipitation" | "wind">("temperature");
+  const [unit, setUnit] = useState<"C" | "F">("C");
+  const [error, setError] = useState<string | null>(null);
+
+  const convertTemp = (temp: number) => {
+    if (unit === "F") {
+      return Math.round((temp * 9) / 5 + 32);
+    }
+    return temp;
+  };
 
   useEffect(() => {
-    const savedLocation = storage.getUserLocation<{ lat?: number; lng?: number; city?: string } | null>(null);
+    const fetchWeather = async (lat: number, lng: number) => {
+      try {
+        const response = await fetch(`/api/weather?lat=${lat}&lng=${lng}`);
+        if (!response.ok) throw new Error("Failed to fetch weather");
+        const data = await response.json();
+        setWeather(data);
+        setLocationStatus("granted");
+      } catch (e) {
+        console.error("Weather fetch error:", e);
+        setError("Failed to load weather data");
+        setLocationStatus("denied");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const savedLocation = storage.getUserLocation<{ lat?: number; lng?: number } | null>(null);
     
-    if (savedLocation?.city) {
-      // Use cached location
-      setWeather({ temp: 22, condition: "Partly Cloudy", city: savedLocation.city });
-      setLocationStatus("granted");
-      setLoading(false);
+    if (savedLocation?.lat && savedLocation?.lng) {
+      fetchWeather(savedLocation.lat, savedLocation.lng);
     } else if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          try {
-            // Get city name from reverse geocoding (simplified - using timezone as city)
-            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-            const city = tz.split("/").pop()?.replace(/_/g, " ") || "Your Location";
-            storage.saveUserLocation({ 
-              lat: position.coords.latitude, 
-              lng: position.coords.longitude,
-              city,
-              timezone: tz 
-            });
-            setWeather({ temp: 22, condition: "Partly Cloudy", city });
-            setLocationStatus("granted");
-          } catch {
-            setLocationStatus("denied");
-          }
-          setLoading(false);
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          storage.saveUserLocation({ 
+            lat: latitude, 
+            lng: longitude,
+          });
+          fetchWeather(latitude, longitude);
         },
-        () => {
+        (err) => {
+          console.error("Geolocation error:", err);
           setLocationStatus("denied");
           setLoading(false);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
         }
       );
     } else {
@@ -450,40 +531,229 @@ const WeatherWidget = memo(function WeatherWidget() {
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center p-4">
-        <div className="animate-pulse text-muted-foreground text-sm">Loading...</div>
+      <div className="h-full flex flex-col items-center justify-center p-4 bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl">
+        <Loader2 className="w-8 h-8 text-sky-400 animate-spin mb-2" />
+        <p className="text-sm text-slate-400">Fetching weather...</p>
       </div>
     );
   }
 
-  if (locationStatus === "denied") {
+  if (locationStatus === "denied" || error) {
     return (
-      <div className="h-full flex flex-col items-center justify-center p-4 text-center">
-        <AlertCircle className="w-6 h-6 text-muted-foreground mb-2" />
-        <p className="text-xs text-muted-foreground">Location permission required</p>
+      <div className="h-full flex flex-col items-center justify-center p-4 text-center bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl">
+        <AlertCircle className="w-8 h-8 text-slate-400 mb-2" />
+        <p className="text-sm text-slate-300 mb-1">Location access needed</p>
+        <p className="text-xs text-slate-500 mb-3">Allow location to see weather</p>
         <button 
-          onClick={() => window.location.reload()}
-          className="text-xs text-primary mt-2 hover:underline"
+          onClick={() => {
+            setLoading(true);
+            setError(null);
+            storage.saveUserLocation(null);
+            window.location.reload();
+          }}
+          className="text-xs text-sky-400 hover:text-sky-300 transition-colors px-3 py-1.5 border border-sky-400/30 rounded-lg hover:bg-sky-400/10"
         >
-          Retry
+          Enable Location
         </button>
       </div>
     );
   }
 
+  if (!weather) return null;
+
+  const now = new Date();
+  const timeString = now.toLocaleTimeString("en-US", { 
+    hour: "numeric", 
+    minute: "2-digit",
+    hour12: true 
+  });
+  const dayString = now.toLocaleDateString("en-US", { weekday: "long" });
+
+  // Find min/max temps for chart scaling
+  const hourlyTemps = weather.hourly.map(h => h.temp);
+  const minTemp = Math.min(...hourlyTemps);
+  const maxTemp = Math.max(...hourlyTemps);
+  const tempRange = maxTemp - minTemp || 1;
+
   return (
-    <div className="h-full flex flex-col p-4">
-      <div className="flex items-center gap-2 mb-2">
-        <Cloud className="w-4 h-4 text-sky-500" />
-        <p className="text-xs text-muted-foreground font-medium">Weather</p>
-      </div>
-      <div className="flex items-center justify-between flex-1">
-        <div>
-          <p className="text-3xl font-bold text-foreground">{weather?.temp}°C</p>
-          <p className="text-xs text-muted-foreground">{weather?.condition}</p>
-          <p className="text-[10px] text-muted-foreground mt-1">{weather?.city}</p>
+    <div className="h-full flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-xl overflow-hidden text-white">
+      {/* Header section */}
+      <div className="flex items-start justify-between p-4 pb-2">
+        <div className="flex items-center gap-3">
+          <WeatherIcon 
+            icon={weather.current.icon} 
+            className={cn(
+              "w-12 h-12",
+              weather.current.isDay ? "text-yellow-400" : "text-blue-300"
+            )} 
+          />
+          <div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-4xl font-light">{convertTemp(weather.current.temp)}</span>
+              <div className="flex items-center text-sm text-slate-400">
+                <button 
+                  onClick={() => setUnit("C")}
+                  className={cn("transition-colors", unit === "C" ? "text-white" : "text-slate-500 hover:text-slate-300")}
+                >
+                  °C
+                </button>
+                <span className="mx-0.5">|</span>
+                <button 
+                  onClick={() => setUnit("F")}
+                  className={cn("transition-colors", unit === "F" ? "text-white" : "text-slate-500 hover:text-slate-300")}
+                >
+                  °F
+                </button>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 text-xs text-slate-400 mt-1">
+              <span className="flex items-center gap-1">
+                <Droplets className="w-3 h-3" />
+                {weather.current.precipitation}%
+              </span>
+              <span className="flex items-center gap-1">
+                <Wind className="w-3 h-3" />
+                {weather.current.humidity}%
+              </span>
+              <span className="flex items-center gap-1">
+                <Cloud className="w-3 h-3" />
+                {weather.current.windSpeed} km/h
+              </span>
+            </div>
+          </div>
         </div>
-        <Sun className="w-10 h-10 text-yellow-500" />
+        <div className="text-right">
+          <p className="text-sm font-medium text-slate-200">Weather</p>
+          <p className="text-xs text-slate-400">{dayString}, {timeString}</p>
+          <p className="text-xs text-slate-400">{weather.current.condition}</p>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-4 px-4 border-b border-slate-700/50">
+        {(["temperature", "precipitation", "wind"] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={cn(
+              "text-xs py-2 capitalize transition-colors border-b-2 -mb-px",
+              activeTab === tab 
+                ? "text-sky-400 border-sky-400" 
+                : "text-slate-500 border-transparent hover:text-slate-300"
+            )}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      {/* Hourly Chart */}
+      <div className="flex-1 px-4 py-3 min-h-0">
+        <div className="h-full flex flex-col">
+          {/* Chart area */}
+          <div className="flex-1 relative min-h-[60px]">
+            {/* Y-axis labels */}
+            <div className="absolute left-0 top-0 bottom-0 flex flex-col justify-between text-[10px] text-slate-500 w-6">
+              <span>{convertTemp(maxTemp)}</span>
+              <span>{convertTemp(Math.round((maxTemp + minTemp) / 2))}</span>
+              <span>{convertTemp(minTemp)}</span>
+            </div>
+            
+            {/* Chart */}
+            <div className="absolute left-8 right-0 top-0 bottom-0">
+              <svg className="w-full h-full" preserveAspectRatio="none">
+                {/* Gradient fill */}
+                <defs>
+                  <linearGradient id="tempGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="rgb(234 179 8 / 0.3)" />
+                    <stop offset="100%" stopColor="rgb(234 179 8 / 0.05)" />
+                  </linearGradient>
+                </defs>
+                
+                {/* Area fill */}
+                <path
+                  d={`
+                    M 0,${100 - ((weather.hourly[0]?.temp - minTemp) / tempRange) * 80}
+                    ${weather.hourly.slice(0, 12).map((h, i) => {
+                      const x = (i / 11) * 100;
+                      const y = 100 - ((h.temp - minTemp) / tempRange) * 80;
+                      return `L ${x},${y}`;
+                    }).join(" ")}
+                    L 100,100 L 0,100 Z
+                  `}
+                  fill="url(#tempGradient)"
+                  className="opacity-60"
+                />
+                
+                {/* Line */}
+                <path
+                  d={`
+                    M 0,${100 - ((weather.hourly[0]?.temp - minTemp) / tempRange) * 80}
+                    ${weather.hourly.slice(0, 12).map((h, i) => {
+                      const x = (i / 11) * 100;
+                      const y = 100 - ((h.temp - minTemp) / tempRange) * 80;
+                      return `L ${x},${y}`;
+                    }).join(" ")}
+                  `}
+                  fill="none"
+                  stroke="rgb(234 179 8)"
+                  strokeWidth="2"
+                  vectorEffect="non-scaling-stroke"
+                />
+              </svg>
+            </div>
+          </div>
+          
+          {/* X-axis labels */}
+          <div className="flex justify-between text-[10px] text-slate-500 pt-1 pl-8">
+            {weather.hourly.slice(0, 12).filter((_, i) => i % 3 === 0).map((h, i) => (
+              <span key={i}>{h.time}</span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* 7-day forecast */}
+      <div className="border-t border-slate-700/50">
+        <div className="flex overflow-x-auto scrollbar-hide">
+          {weather.daily.slice(0, 8).map((day, i) => (
+            <div
+              key={day.date}
+              className={cn(
+                "flex-shrink-0 flex flex-col items-center py-2 px-3 min-w-[60px]",
+                i === 0 && "bg-slate-700/30"
+              )}
+            >
+              <span className="text-[10px] text-slate-400 mb-1">{day.day}</span>
+              <WeatherIcon 
+                icon={day.icon} 
+                className="w-5 h-5 text-yellow-500 my-1" 
+              />
+              <div className="flex items-center gap-1 text-[10px]">
+                <span className="text-slate-200">{convertTemp(day.tempMax)}°</span>
+                <span className="text-slate-500">{convertTemp(day.tempMin)}°</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Location footer */}
+      <div className="flex items-center justify-between px-4 py-2 bg-slate-800/50 text-[10px] text-slate-500">
+        <span className="flex items-center gap-1">
+          <MapPin className="w-3 h-3" />
+          {weather.location.city}
+        </span>
+        <button 
+          onClick={() => {
+            setLoading(true);
+            storage.saveUserLocation(null);
+            window.location.reload();
+          }}
+          className="hover:text-slate-300 transition-colors"
+        >
+          <RefreshCw className="w-3 h-3" />
+        </button>
       </div>
     </div>
   );
@@ -491,36 +761,73 @@ const WeatherWidget = memo(function WeatherWidget() {
 
 // Location widget with permission
 const LocationWidget = memo(function LocationWidget() {
-  const [location, setLocation] = useState<{ city: string; country: string; timezone: string } | null>(null);
+  const [location, setLocation] = useState<{ city: string; country: string; timezone: string; coords?: { lat: number; lng: number } } | null>(null);
   const [locationStatus, setLocationStatus] = useState<"pending" | "granted" | "denied">("pending");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const savedLocation = storage.getUserLocation<{ city?: string; timezone?: string } | null>(null);
+    const fetchLocationName = async (lat: number, lng: number) => {
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&addressdetails=1`,
+          { headers: { "User-Agent": "TaskManager/1.0" } }
+        );
+        if (response.ok) {
+          const data = await response.json();
+          const city = data.address?.city || 
+                       data.address?.town || 
+                       data.address?.village || 
+                       data.address?.municipality ||
+                       data.address?.county ||
+                       "Your Location";
+          const country = data.address?.country || "Unknown";
+          return { city, country };
+        }
+      } catch (e) {
+        console.error("Reverse geocoding error:", e);
+      }
+      return { city: "Your Location", country: "Unknown" };
+    };
+
+    const savedLocation = storage.getUserLocation<{ lat?: number; lng?: number; city?: string; country?: string; timezone?: string } | null>(null);
     
-    if (savedLocation?.city) {
+    if (savedLocation?.city && savedLocation?.lat && savedLocation?.lng) {
       const tz = savedLocation.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-      setLocation({ city: savedLocation.city, country: "Your Country", timezone: tz });
+      setLocation({ 
+        city: savedLocation.city, 
+        country: savedLocation.country || "Unknown", 
+        timezone: tz,
+        coords: { lat: savedLocation.lat, lng: savedLocation.lng }
+      });
       setLocationStatus("granted");
       setLoading(false);
     } else if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
+        async (position) => {
+          const { latitude, longitude } = position.coords;
           const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-          const city = tz.split("/").pop()?.replace(/_/g, " ") || "Unknown";
+          const { city, country } = await fetchLocationName(latitude, longitude);
+          
           storage.saveUserLocation({ 
-            lat: position.coords.latitude, 
-            lng: position.coords.longitude,
+            lat: latitude, 
+            lng: longitude,
             city,
+            country,
             timezone: tz 
           });
-          setLocation({ city, country: "Your Country", timezone: tz });
+          setLocation({ city, country, timezone: tz, coords: { lat: latitude, lng: longitude } });
           setLocationStatus("granted");
           setLoading(false);
         },
-        () => {
+        (err) => {
+          console.error("Geolocation error:", err);
           setLocationStatus("denied");
           setLoading(false);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
         }
       );
     } else {
@@ -545,7 +852,7 @@ const LocationWidget = memo(function LocationWidget() {
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center p-4">
-        <div className="animate-pulse text-muted-foreground text-sm">Loading...</div>
+        <Loader2 className="w-5 h-5 text-primary animate-spin" />
       </div>
     );
   }
@@ -554,12 +861,15 @@ const LocationWidget = memo(function LocationWidget() {
     return (
       <div className="h-full flex flex-col items-center justify-center p-4 text-center">
         <AlertCircle className="w-6 h-6 text-muted-foreground mb-2" />
-        <p className="text-xs text-muted-foreground">Location permission required</p>
+        <p className="text-xs text-muted-foreground">Location access needed</p>
         <button 
-          onClick={() => window.location.reload()}
+          onClick={() => {
+            storage.saveUserLocation(null);
+            window.location.reload();
+          }}
           className="text-xs text-primary mt-2 hover:underline"
         >
-          Retry
+          Enable Location
         </button>
       </div>
     );
@@ -571,11 +881,17 @@ const LocationWidget = memo(function LocationWidget() {
     <div className="h-full flex flex-col p-4">
       <MapPin className="w-4 h-4 text-primary mb-2" />
       <p className="text-sm font-medium text-foreground">{location?.city}</p>
-      <p className="text-xs text-muted-foreground">{location?.timezone}</p>
+      <p className="text-xs text-muted-foreground">{location?.country}</p>
+      <p className="text-[10px] text-muted-foreground mt-1">{location?.timezone}</p>
       <div className="flex gap-3 mt-2 text-[10px] text-muted-foreground">
         <span>Rise: {sunTimes.rise}</span>
         <span>Set: {sunTimes.set}</span>
       </div>
+      {location?.coords && (
+        <p className="text-[9px] text-muted-foreground/60 mt-1">
+          {location.coords.lat.toFixed(4)}°, {location.coords.lng.toFixed(4)}°
+        </p>
+      )}
     </div>
   );
 });
