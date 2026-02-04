@@ -473,6 +473,7 @@ const WeatherWidget = memo(function WeatherWidget() {
   const [activeTab, setActiveTab] = useState<"temperature" | "precipitation" | "wind">("temperature");
   const [unit, setUnit] = useState<"C" | "F">("C");
   const [error, setError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState("Initializing...");
 
   const convertTemp = (temp: number) => {
     if (unit === "F") {
@@ -482,58 +483,101 @@ const WeatherWidget = memo(function WeatherWidget() {
   };
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchWeather = async (lat: number, lng: number) => {
+      if (!isMounted) return;
+      setStatusMessage("Fetching weather data...");
+      console.log("[v0] Fetching weather for:", lat, lng);
+      
       try {
         const response = await fetch(`/api/weather?lat=${lat}&lng=${lng}`);
-        if (!response.ok) throw new Error("Failed to fetch weather");
+        console.log("[v0] Weather API response status:", response.status);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("[v0] Weather API error:", errorText);
+          throw new Error("Failed to fetch weather");
+        }
+        
         const data = await response.json();
-        setWeather(data);
-        setLocationStatus("granted");
+        console.log("[v0] Weather data received:", data);
+        
+        if (isMounted) {
+          setWeather(data);
+          setLocationStatus("granted");
+          setLoading(false);
+        }
       } catch (e) {
-        console.error("Weather fetch error:", e);
-        setError("Failed to load weather data");
-        setLocationStatus("denied");
-      } finally {
-        setLoading(false);
+        console.error("[v0] Weather fetch error:", e);
+        if (isMounted) {
+          setError("Failed to load weather data");
+          setLocationStatus("denied");
+          setLoading(false);
+        }
       }
     };
 
-    const savedLocation = storage.getUserLocation<{ lat?: number; lng?: number } | null>(null);
-    
-    if (savedLocation?.lat && savedLocation?.lng) {
-      fetchWeather(savedLocation.lat, savedLocation.lng);
-    } else if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          storage.saveUserLocation({ 
-            lat: latitude, 
-            lng: longitude,
-          });
-          fetchWeather(latitude, longitude);
-        },
-        (err) => {
-          console.error("Geolocation error:", err);
+    const getLocation = () => {
+      setStatusMessage("Checking saved location...");
+      const savedLocation = storage.getUserLocation<{ lat?: number; lng?: number } | null>(null);
+      console.log("[v0] Saved location:", savedLocation);
+      
+      if (savedLocation?.lat && savedLocation?.lng) {
+        fetchWeather(savedLocation.lat, savedLocation.lng);
+      } else if (navigator.geolocation) {
+        setStatusMessage("Requesting location access...");
+        console.log("[v0] Requesting geolocation...");
+        
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            console.log("[v0] Geolocation success:", position.coords);
+            const { latitude, longitude } = position.coords;
+            storage.saveUserLocation({ 
+              lat: latitude, 
+              lng: longitude,
+            });
+            fetchWeather(latitude, longitude);
+          },
+          (err) => {
+            console.error("[v0] Geolocation error:", err.code, err.message);
+            if (isMounted) {
+              setError(`Location error: ${err.message}`);
+              setLocationStatus("denied");
+              setLoading(false);
+            }
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 0,
+          }
+        );
+      } else {
+        console.error("[v0] Geolocation not supported");
+        if (isMounted) {
+          setError("Geolocation not supported");
           setLocationStatus("denied");
           setLoading(false);
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0,
         }
-      );
-    } else {
-      setLocationStatus("denied");
-      setLoading(false);
-    }
+      }
+    };
+
+    // Small delay to ensure component is mounted
+    const timer = setTimeout(getLocation, 100);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
   }, []);
 
   if (loading) {
     return (
       <div className="h-full flex flex-col items-center justify-center p-4 bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl">
         <Loader2 className="w-8 h-8 text-sky-400 animate-spin mb-2" />
-        <p className="text-sm text-slate-400">Fetching weather...</p>
+        <p className="text-sm text-slate-400">{statusMessage}</p>
+        <p className="text-xs text-slate-500 mt-1">Please allow location access if prompted</p>
       </div>
     );
   }
@@ -543,17 +587,15 @@ const WeatherWidget = memo(function WeatherWidget() {
       <div className="h-full flex flex-col items-center justify-center p-4 text-center bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl">
         <AlertCircle className="w-8 h-8 text-slate-400 mb-2" />
         <p className="text-sm text-slate-300 mb-1">Location access needed</p>
-        <p className="text-xs text-slate-500 mb-3">Allow location to see weather</p>
+        <p className="text-xs text-slate-500 mb-3">{error || "Allow location to see weather"}</p>
         <button 
           onClick={() => {
-            setLoading(true);
-            setError(null);
             storage.saveUserLocation(null);
             window.location.reload();
           }}
           className="text-xs text-sky-400 hover:text-sky-300 transition-colors px-3 py-1.5 border border-sky-400/30 rounded-lg hover:bg-sky-400/10"
         >
-          Enable Location
+          Retry Location Access
         </button>
       </div>
     );
