@@ -23,7 +23,7 @@ import {
   LayoutGrid,
   Columns,
   Command,
-  Sparkles,
+  BriefcaseBusiness,
   Check,
   X,
   Clock,
@@ -104,13 +104,13 @@ export function Header({
               className="relative"
             >
               <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                <Sparkles className="h-5 w-5 text-primary-foreground" />
+                <BriefcaseBusiness className="h-5 w-5 text-primary-foreground" />
               </div>
               <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-accent animate-pulse" />
             </motion.div>
             <div>
-              <h1 className="text-xl font-bold text-foreground tracking-tight">Bento</h1>
-              <p className="text-xs text-muted-foreground">Task Manager</p>
+              <h1 className="text-xl font-bold text-foreground tracking-tight">Northstar</h1>
+              <p className="text-xs text-muted-foreground">Work Hub</p>
             </div>
           </div>
 
@@ -157,7 +157,7 @@ export function Header({
                 onClick={() => onViewChange("bento")}
               >
                 <LayoutGrid className="h-4 w-4 mr-2" />
-                Bento
+                Hub
               </Button>
               <Button
                 variant="ghost"

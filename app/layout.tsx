@@ -3,14 +3,15 @@ import type { Metadata } from 'next'
 import { Inter, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
+import { AuthProvider } from '@/components/hrms/auth-provider'
 import './globals.css'
 
 const _inter = Inter({ subsets: ["latin"], variable: '--font-inter' });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'Bento - Modern Task Management',
-  description: 'A beautiful, innovative task manager with bento box UI and Kanban-style drag and drop',
+  title: 'Northstar HRMS Portal',
+  description: 'Native HRMS, employee management, approvals, collaboration, and work management portal built with Next.js and Django.',
   generator: 'v0.app',
   icons: {
     icon: [
@@ -46,7 +47,7 @@ export default function RootLayout({
           disableTransitionOnChange
           storageKey="bento-theme"
         >
-          {children}
+          <AuthProvider>{children}</AuthProvider>
         </ThemeProvider>
         <Analytics />
       </body>

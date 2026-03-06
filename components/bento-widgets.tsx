@@ -42,7 +42,7 @@ export function HeroStatsWidget({ tasks }: BentoWidgetProps) {
       <div className="relative z-10">
         <p className="text-sm font-medium text-muted-foreground mb-2">Task Overview</p>
         <h2 className="text-5xl font-bold text-foreground tracking-tight">
-          Bento
+          Work Hub
         </h2>
       </div>
 

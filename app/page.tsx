@@ -53,6 +53,8 @@ import {
   Maximize2,
 } from "lucide-react";
 import { storage } from "@/lib/storage";
+import { DashboardOverview } from "@/components/hrms/dashboard-overview";
+import { ProtectedPortal } from "@/components/hrms/protected-portal";
 
 type SortOption = "priority" | "dueDate" | "title" | "createdAt";
 
@@ -225,7 +227,7 @@ const DEFAULT_TEMPLATES: TaskTemplate[] = [
   },
 ];
 
-export default function TaskManager() {
+export function TaskManagerPage() {
   const { toast } = useToast();
   const searchInputRef = useRef<HTMLInputElement>(null);
   
@@ -1890,9 +1892,9 @@ export default function TaskManager() {
                 exit={{ opacity: 0, x: -20 }}
               >
                 <div className="mb-6">
-                  <h2 className="text-2xl font-bold text-foreground">Bento</h2>
+                  <h2 className="text-2xl font-bold text-foreground">Work Hub</h2>
                   <p className="text-muted-foreground mt-1">
-                    Your productivity at a glance
+                    A condensed view of project and task momentum
                   </p>
                 </div>
 
@@ -2025,5 +2027,13 @@ export default function TaskManager() {
       {/* Toast Container */}
       <Toaster />
     </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <ProtectedPortal>
+      <DashboardOverview />
+    </ProtectedPortal>
   );
 }

@@ -880,7 +880,7 @@ export function ResizableBentoGrid({ tasks, onNewTask, onEditTask, onToggleSubta
           <div className="h-full flex flex-col justify-between p-5">
             <div>
               <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Task Overview</p>
-              <h2 className="text-3xl font-bold text-foreground mt-1">Bento</h2>
+              <h2 className="text-3xl font-bold text-foreground mt-1">Work Hub</h2>
             </div>
             <div className="flex items-end justify-between gap-4">
               <div>
@@ -1363,12 +1363,12 @@ case "surprise-me": {
           className="rounded-xl gap-2"
         >
           <Plus className="w-4 h-4" />
-          Add Bento
+          Add Widget
           <Badge variant="secondary" className="ml-1">{activeWidgets.length}/10</Badge>
         </Button>
       </div>
 
-      {/* Bento Grid */}
+      {/* Work Hub Grid */}
       <div
         className="grid gap-4"
         style={{
@@ -1451,7 +1451,7 @@ case "surprise-me": {
       <Dialog open={selectorOpen} onOpenChange={setSelectorOpen}>
         <DialogContent className="max-w-3xl max-h-[80vh] rounded-2xl p-0 overflow-hidden">
           <DialogHeader className="p-6 pb-4 border-b">
-            <DialogTitle className="text-xl">Add Bento Widgets</DialogTitle>
+            <DialogTitle className="text-xl">Add Workspace Widgets</DialogTitle>
             <p className="text-sm text-muted-foreground">
               Select widgets to add to your dashboard (max 10)
             </p>
